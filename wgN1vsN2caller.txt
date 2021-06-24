@@ -1,0 +1,14 @@
+
+# N1-N2
+
+browser position chr12:7658907-7678907
+
+track type=bigWig name=“N1-N2-pwd” description=“N1-N2-pwd” bigDataUrl=https://data.cyverse.org/dav-anon/iplant/home/ucsccx2020/ucsccx2020/wgdf14pwd.bw
+
+track type=bigWig name=“N1-beta” description=“Normal1-beta” bigDataUrl=https://data.cyverse.org/dav-anon/iplant/home/ucsccx2020/wg_s1beta.bw
+
+track type=bigWig name=“N1-coverage” description=“Normal1-converage” bigDataUrl=https://data.cyverse.org/dav-anon/iplant/home/ucsccx2020/wg_s1coverage.bw
+
+track type=bigWig name=“N2-beta” description=“Normal2-beta” bigDataUrl=https://data.cyverse.org/dav-anon/iplant/home/ucsccx2020/wg_s4beta.bw
+
+track type=bigWig name=“N2-coverage” description=“Normal2-coverage” bigDataUrl=https://data.cyverse.org/dav-anon/iplant/home/ucsccx2020/wg_s4coverage.bw

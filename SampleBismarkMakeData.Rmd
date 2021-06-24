@@ -1,0 +1,68 @@
+---
+title: "SampleBismarkMakeData"
+author: "Caihong Xia"
+output: html_document
+---
+
+```{r echo = FALSE, warning=FALSE}
+library(dplyr)
+library(data.table)
+
+read_met <- function(x) {
+  dat <- fread(x, header=F)
+  colnames(dat) <- c("chr", "start", "end", "beta", "num_met", "num_unmet")
+  dat$coverage <- dat$num_met + dat$num_unmet
+  return(dat)
+}
+
+read_pos <- function(x){
+  dat <- fread(x, header = F)
+  colnames(dat) <- c('Bismark', 'methylation', 'extractor', 'version', 'v0.22.3')
+  return(dat)
+}
+
+makedata <- function(metdata, cpgob, cpgot){
+  
+# C position on OB strand
+cposob <- cpgob %>% distinct(extractor, version) %>% arrange(extractor, version) %>% rename("extractor"="chr", "version"="end") %>% dplyr:: select(chr, end)
+
+# C position on OT strand
+cposot <- cpgot %>% distinct(extractor, version) %>% arrange(extractor, version) %>% rename("extractor"="chr", "version"="start") %>% dplyr:: select(chr, start)
+
+# Get metdata on covered positions
+datob <- inner_join(metdata, cposob, by = c('chr','end')) %>% dplyr::select(chr, end, num_met, num_unmet)
+datot <- inner_join(metdata, cposot, by = c('chr', 'start')) %>% mutate(end=start+1) %>% dplyr::select(chr, start, end, num_met, num_unmet)
+
+# Convert C-metrics data to CpG-metrics data
+datall <- full_join(datob, datot, by = c('chr', 'end')) %>% 
+            mutate(start = ifelse(is.na(start), end-1, start),
+                    start = as.integer(start),
+                     end = as.integer(end),
+                    num_met.x = ifelse(is.na(num_met.x), 0, num_met.x),
+                     num_met.y = ifelse(is.na(num_met.y), 0, num_met.y),
+                       num_unmet.x = ifelse(is.na(num_unmet.x), 0, num_unmet.x),
+                         num_unmet.y = ifelse(is.na(num_unmet.y), 0, num_unmet.y),
+                           num_met=num_met.x+num_met.y, 
+                             num_unmet=num_unmet.x+num_unmet.y,
+                               coverage=num_met+num_unmet,
+                               beta=num_met/coverage) %>% 
+              # filter(coverage>4) %>% 
+                dplyr:: select(chr, start, end, beta, coverage, num_met, num_unmet) %>% 
+                   arrange(chr, start, end)
+
+return(datall)
+}
+
+```
+
+
+```{r}
+
+ metdata <- read_met("AS1L1.multiple.deduplicated.bismark.cov.gz")
+ cpgob <- read_pos("CpG_OB_AS1L1.multiple.deduplicated.txt.gz")
+ cpgot <- read_pos("CpG_OT_AS1L1.multiple.deduplicated.txt.gz")
+ metdata_s1 <- makedata(metdata, cpgob, cpgot)
+ #summary(metdata_s1)
+ #write.table(metdata_s1, "wg_s1n.bed", row.names = F, col.names = F, quote = F, sep = "\t")
+
+ ···
