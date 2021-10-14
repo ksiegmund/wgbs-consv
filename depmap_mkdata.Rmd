@@ -1,0 +1,274 @@
+---
+title: "depmap_perGene"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# {.tabset}
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(slider)
+library(ggplot2)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library(ggridges)
+library(viridis)
+
+```
+
+```{r funs, echo=FALSE, warning=FALSE}
+
+read_pwd <- function(x){
+  dat <- fread(x, header = F)
+  colnames(dat) <- c("chr", "start", "end", "pwd", "beta.x", "beta.y")
+  return(dat)
+}
+
+# Annotation function
+annot <- function(dat, region){
+  wgpos <- GRanges(dat)
+  dm_annotated <- annotate_regions(
+    regions = wgpos,
+    annotations = region,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+  
+  dat_annot <- data.frame(dm_annotated)
+  
+  return(dat_annot)
+}
+
+# cpg associated with each gene type
+cpgineachgenetype <- function(dat){
+  wggenes <- dat %>%
+    group_by(annot.transcript_id, annot.type, annot.exon_id) %>% 
+    mutate(n_sites = length(start),
+           ave_pwd=mean(pwd, na.rm = TRUE),
+           ave_beta1 = mean(beta.x, na.rm = TRUE),
+            ave_beta2 = mean(beta.y, na.rm = TRUE)) %>% ungroup %>% 
+    distinct(seqnames, annot.gene_name, annot.type, annot.exon_id, annot.region_length, n_sites, ave_pwd, ave_beta1, ave_beta2)
+  return(wggenes)
+}
+
+# cpg in essential gene
+cpg_essential <- function(dat){
+  cpgessential <- dat %>% inner_join(essentialgene, by =c("annot.gene_name"="gene")) %>% mutate(grp="essential")
+  return(cpgessential)
+}
+
+# cpg not essential gene
+cpg_notessential <- function(dat){
+  cpgnotessential <- dat %>% anti_join(essentialgene, by =c("annot.gene_name"="gene")) %>% mutate(grp="non-essential")
+  return(cpgnotessential)
+}
+
+combdata <- function(dat){
+  essential <- cpg_essential(dat)
+  notessential <- cpg_notessential(dat)
+  essential_sub <- essential %>% dplyr::select(-score)
+  comb <- rbind(essential_sub, notessential)%>% 
+   left_join(expdata, by=c("annot.gene_name"="Gene name")) %>%
+    mutate(labels=ifelse(grp=="essential", 1, 0),
+            expcat=ifelse(logtpm==0, "NotExpressed", "Expressed"),
+             group=paste0(grp, "_", expcat))
+  return(comb)
+}
+
+```
+
+
+```{r readdata, echo=FALSE, warning=FALSE, eval=FALSE}
+
+wgdf14pwd <- read_pwd("wgdf14cpwdm.bed") 
+wgdf23pwd <- read_pwd("wgdf23cpwdm.bed") 
+wgdf56pwd <- read_pwd("wgdf56cpwdm.bed") 
+wgdf12pwd <- read_pwd("wgdf12pwdm.bed") 
+wgdf34pwd <- read_pwd("wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("wgdf56pwdm.bed") 
+generef <- readGFF("hg38.ncbiRefSeq.gtf.gz")
+
+uniquetranscript <- generef %>% filter(type=="transcript") %>% 
+  mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+   group_by(gene_id) %>% 
+    mutate(maxtran = max(region_length)) %>% 
+     filter(region_length==maxtran) %>% ungroup %>% 
+       group_by(gene_id) %>% mutate(rank=row_number()) %>% filter(rank==1) %>% 
+        dplyr::select(gene_id, transcript_id)
+
+generef2 <- generef %>% right_join(uniquetranscript,by=c("gene_id", "transcript_id")) %>% mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+wholegene <- generef2 %>% dplyr::filter(type=="transcript") %>% 
+  mutate(tss_start = ifelse(strand=="+", start - 2000, start),
+          tss_end = ifelse(strand=="+", end, end + 2000),
+           region_length = tss_end - tss_start +1, 
+            tss_type = "wholegene") %>% 
+               dplyr::select(-start, -end, -type) %>% 
+                mutate(start=tss_start, end=tss_end, type=tss_type) %>% 
+                 dplyr::select(-tss_start, -tss_end, -tss_type) %>%
+                  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+gene_region <- GRanges(wholegene)
+
+# essential gene list
+ depmaplist <- read_excel("depmaplist.xlsx", sheet = 1)
+ summary(depmaplist$depmap)
+ essentialgene <- depmaplist %>% filter(depmap <= -0.4) %>%
+   mutate(score=depmap) %>% 
+   dplyr::select(gene, score) 
+ #summary(essentialgene$score)
+ 
+expdata <- read_excel("SUMMARY OF KOREAN SINGLE CELL EXPRESSION COLON GSE132257.xlsx") 
+colnames(expdata) <- c("logtpm", "average", "GSE", "Gene name")
+expdata <- expdata %>% dplyr::select(logtpm, average, GSE, "Gene name") %>% mutate(expcat=ifelse(logtpm==0, "NotExpressed", "Expressed"))
+#summary(expdata$logtpm)
+
+```
+
+## Make data
+
+```{r mkdata_wide, echo=FALSE, warning=FALSE, eval=FALSE}
+
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+
+wg_tsslist <- list()
+for(i in 1:6){
+  
+  wggene <- annot(datlist[[i]], gene_region)
+
+   wggeneeachtype <- cpgineachgenetype(wggene)
+   wg_tss <- combdata(wggeneeachtype)
+   wg_tsslist[[i]] <- wg_tss
+   
+}
+
+depmap_pwd <- list()
+for(i in 1:6){
+  
+ck <- wg_tsslist[[i]] %>% dplyr::select(seqnames, annot.gene_name, grp, expcat, group, n_sites, ave_pwd, ave_beta1, ave_beta2)
+colnames(ck)[6:9] <- c(sprintf("n_sites_%s", titlelist[[i]]), sprintf("ave_pwd_%s", titlelist[[i]]), sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))
+depmap_pwd[[i]] <- ck
+
+}
+
+depmap_pwdall <- depmap_pwd[[1]] %>% 
+  inner_join(depmap_pwd[[2]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>% 
+  inner_join(depmap_pwd[[3]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
+  inner_join(depmap_pwd[[4]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
+  inner_join(depmap_pwd[[5]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
+  inner_join(depmap_pwd[[6]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) 
+
+write_csv(depmap_pwdall, "depmap_pwdall.csv")
+
+# Remove chrX & chrY
+ckdata <- read_csv("depmap_pwdall.csv") %>% filter(seqnames!="chrX" & seqnames!="chrY") 
+
+table(ckdata$seqnames)
+
+length(unique(ckdata$annot.gene_name))
+
+write_csv(ckdata, "depmap_pwdall.csv")
+
+
+```
+
+```{r mkdata_long, echo=FALSE, warning=FALSE, eval=FALSE}
+
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+
+wg_tsslist <- list()
+for(i in 1:6){
+  
+  wggene <- annot(datlist[[i]], gene_region)
+
+   wggeneeachtype <- cpgineachgenetype(wggene)
+   wg_tss <- combdata(wggeneeachtype)
+   wg_tsslist[[i]] <- wg_tss
+   
+}
+
+depmap_pwd <- list()
+for(i in 1:6){
+  
+depmap_pwd[[i]] <- wg_tsslist[[i]] %>% dplyr::select(seqnames, annot.gene_name, grp, expcat, group, n_sites, ave_pwd, ave_beta1, ave_beta2) %>% mutate(whichpair = titlelist[[i]])
+}
+
+depmap_pwdall <- bind_rows(depmap_pwd)
+
+write_csv(depmap_pwdall, "depmap_pwdall_long.csv")
+
+# Remove chrX & chrY
+ckdata <- read.csv("depmap_pwdall_long.csv") %>% filter(seqnames!="chrX" & seqnames!="chrY") 
+
+table(ckdata$seqnames)
+
+write_csv(ckdata, "depmap_pwdall_long.csv")
+
+```
+
+
+```{r mkplot, echo=FALSE, warning=FALSE}
+
+wktmp <- read.csv("depmap_pwdall.csv") %>% filter(grp=="essential")
+
+sp <- ggscatter(wktmp, x = "ave_pwd_HAHB", y = "ave_pwd_JAJB",
+   add = "reg.line", conf.int = TRUE,
+    add.params = list(color = "blue", fill = "lightgray"),
+     title = "DepMap essential gene, J vs. H pwd",
+      xlab = "Average pwd in HAHB",
+       ylab = "Average pwd in JAJB",
+        xlim = c(0,1), ylim = c(0,1)
+   )
+# Add correlation coefficient
+sp + stat_cor(method = "pearson", label.x = 0.7, label.y = 0.8, p.accuracy = 0.001, r.accuracy = 0.01)
+
+sp <- ggscatter(wktmp, x = "ave_pwd_HAHB", y = "ave_pwd_MAMB",
+   add = "reg.line", conf.int = TRUE,
+    add.params = list(color = "blue", fill = "lightgray"),
+     title = "DepMap essential gene, M vs. H pwd",
+      xlab = "Average pwd in HAHB",
+       ylab = "Average pwd in MAMB",
+        xlim = c(0,1), ylim = c(0,1)
+   )
+# Add correlation coefficient
+sp + stat_cor(method = "pearson", label.x = 0.7, label.y = 0.8, p.accuracy = 0.001, r.accuracy = 0.01)
+
+wk <- wktmp %>% dplyr::select(starts_with("ave_pwd_"))
+colnames(wk) <- c("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+
+# Compute a correlation matrix
+corr <- round(cor(wk), 2)
+head(corr[, 1:6])
+
+# Compute a matrix of correlation p-values
+p.mat <- round(cor_pmat(wk), 3)
+head(p.mat[, 1:6])
+
+# Visualize the correlation matrix, Add correlation coefficients and correlation significance level
+ggcorrplot(corr, outline.col = "white", lab = TRUE, p.mat = p.mat) + labs(title = "DepMap essential gene")
+
+```
+
+
+
+
+
+
+
+
+
+

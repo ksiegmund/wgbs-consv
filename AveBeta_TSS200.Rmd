@@ -1,0 +1,158 @@
+---
+title: "AveBeta_TSS200"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(slider)
+library(ggplot2)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library(ggridges)
+library(viridis)
+library("ggpubr")
+source("depmapWiganal.R")
+
+```
+
+
+```{r importdata, echo=FALSE, warning=FALSE}
+
+wgdf14pwd <- read_pwd("wgdf14cpwdm.bed") 
+wgdf23pwd <- read_pwd("wgdf23cpwdm.bed") 
+wgdf56pwd <- read_pwd("wgdf56cpwdm.bed") 
+wgdf12pwd <- read_pwd("wgdf12pwdm.bed") 
+wgdf34pwd <- read_pwd("wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("wgdf56pwdm.bed") 
+generef <- readGFF("hg38.ncbiRefSeq.gtf.gz")
+
+uniquetranscript <- generef %>% filter(type=="transcript") %>% 
+  mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+   group_by(gene_id) %>% 
+    mutate(maxtran = max(region_length)) %>% 
+     filter(region_length==maxtran) %>% ungroup %>% 
+       group_by(gene_id) %>% mutate(rank=row_number()) %>% filter(rank==1) %>% 
+        dplyr::select(gene_id, transcript_id)
+
+generef2 <- generef %>% right_join(uniquetranscript,by=c("gene_id", "transcript_id")) %>% mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+gene5UTR <- generef2 %>% dplyr::filter(type=="5UTR")
+
+geneTSS200 <- gene5UTR %>% mutate(tss_start = ifelse(strand=="+", start - 200, end+1),
+                                  tss_end = ifelse(strand=="+", start -1, end +200),
+                                  region_length = tss_end - tss_start +1, 
+                                  tss_type = "TSS200") %>% 
+               dplyr::select(-start, -end, -type) %>% 
+                mutate(start=tss_start, end=tss_end, type=tss_type) %>% 
+                 dplyr::select(-tss_start, -tss_end, -tss_type) %>%
+                  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+tss200region <- GRanges(geneTSS200)
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+alist <- list("N1", "JA", "IA", "DA", "HA", "MA")
+blist <- list("N2", "JB", "IB", "DB", "HB", "MB")
+
+avebeta_tss200 <- list()
+
+for (i in 1:6){
+  
+ck <- annot(datlist[[i]], tss200region)
+
+ck2 <- ck %>% group_by(annot.seqnames, annot.start, annot.end) %>% 
+  mutate(ave_methy_a = mean(beta.x),
+          ave_methy_b = mean(beta.y),
+           ave_pwd = mean(pwd),
+            whichpair = titlelist[[i]]) %>% 
+  distinct(annot.seqnames, annot.start, annot.end, annot.gene_name, ave_methy_a, ave_methy_b, ave_pwd, whichpair)
+
+avebeta_tss200[[i]] <- ck2
+
+# plot1 <- ck2 %>% 
+#   ggplot(aes(x = ave_methy_a, y = ave_pwd)) +
+#   geom_point() +
+#    geom_smooth() +
+#     ylim(0, 1) +
+#      xlim(0, 1) +
+#       ylab(sprintf("Average pwd %s", titlelist[[i]])) +
+#        xlab(sprintf("Average methylation rate in %s", alist[[i]])) +
+#         ggtitle(sprintf("TSS200, %s", titlelist[[i]]))
+# 
+# plot2 <- ck2 %>% 
+#   ggplot(aes(x = ave_methy_b, y = ave_pwd)) +
+#   geom_point() +
+#    geom_smooth() +
+#     ylim(0, 1) +
+#      xlim(0, 1) +
+#       ylab(sprintf("Average pwd %s", titlelist[[i]])) +
+#        xlab(sprintf("Average methylation rate in %s", blist[[i]])) +
+#         ggtitle(sprintf("TSS200, %s", titlelist[[i]]))
+# 
+# print(ggarrange(plot1, plot2, 
+#               labels = c("A", "B"),
+#               ncol = 2, nrow = 1))
+
+}
+
+ave_beta_tss200 <- bind_rows(avebeta_tss200)
+write_csv(ave_beta_tss200, "ave_beta_tss200.csv")
+
+# Exclude chrX & chrY
+wktmp <- read_csv("ave_beta_tss200.csv") %>% filter(annot.seqnames!="chrX" & annot.seqnames!="chrY") %>% 
+rowwise() %>%  mutate(ave_beta = mean(c(ave_methy_a, ave_methy_b))) %>% ungroup()
+write_csv(wktmp, "ave_beta_tss200.csv")
+
+# unique
+wktmp <- read_csv("ave_beta_tss200.csv") %>% distinct(annot.seqnames, annot.start, annot.end, ave_pwd, ave_beta, whichpair)
+table(wktmp$whichpair)
+write_csv(wktmp, "ave_beta_tss200_long_unique.csv")
+
+# make wide form data for pairwise correlation test
+
+wktmp <- read_csv("ave_beta_tss200.csv")
+table(wktmp$whichpair)
+
+tsslist <- list()
+for(i in 1:6){
+  ck <- wktmp %>% filter(whichpair==titlelist[[i]]) %>% dplyr::select(annot.seqnames, annot.start, annot.end, ave_methy_a, ave_methy_b, ave_pwd, ave_beta)
+  colnames(ck) <- c("seqnames", "start", "end", sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]), sprintf("ave_pwd_%s", titlelist[[i]]), sprintf("ave_beta_%s", titlelist[[i]]))
+  tsslist[[i]] <- ck
+}
+
+head(tsslist[[1]])
+tss200_pwdall <- tsslist[[1]] %>% 
+  inner_join(tsslist[[2]], by=c("seqnames", "start", "end")) %>% 
+  inner_join(tsslist[[3]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[4]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[5]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[6]], by=c("seqnames", "start", "end")) %>% distinct()
+
+write_csv(tss200_pwdall, "ave_beta_tss200_wide_unique.csv")
+
+```
+
+
+
+
+
+
+

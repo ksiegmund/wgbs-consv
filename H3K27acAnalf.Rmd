@@ -1,0 +1,231 @@
+---
+title: "H3K27acAnalf"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library("genomation")
+library("ggpubr")
+source("H3K27func.R")
+
+```
+
+
+```{r readbed, echo=FALSE, warning=FALSE}
+
+#  https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg19&g=wgEncodeBroadHistone
+
+# read H3K27ac data and liftover from hg19 to hg38 
+
+celllist <- list("Gm12878", "H1hesc", "Hsmm", "Huvec", "K562", "Nhek", "Nhlf")
+
+chainObject1 <- import.chain("hg19ToHg38.over.chain")
+
+aclist <- list()
+for (i in 1:7){
+  wktmp <- import.bw(sprintf("wgEncodeBroadHistone%sH3k27acStdSig.bigWig", celllist[[i]]))
+  aclist[[i]] <- as.data.frame(liftOver(wktmp, chainObject1))
+}
+
+# peaklist <- list()
+# for (i in 1:11){
+#   wktmp <- readBroadPeak(sprintf("wgEncodeBroadHistone%sStdPk.broadPeak.gz", samplelist[[i]]), track.line=FALSE, zero.based=TRUE)
+#   peaklist[[i]] <- as.data.frame(liftOver(wktmp, chainObject1))
+# }
+
+```
+
+
+```{r, mkchr2regions, echo=FALSE, warning=FALSE}
+
+# create chr 100bp bins regions
+
+howlonglist <- list(2500000, 2422000, 1982000, 1903000, 1815000, 1708000, 1594000, 1451000, 1384000, 1338000,
+                    1351000, 1333000, 1144000, 1069000, 1020000, 902300, 832500, 802700, 590000, 643400, 467000, 508100)
+
+chrreglist <- list()
+
+for (i in 1:22){
+  chrreglist[[i]] <- mkchrreg(howlonglist[[i]], sprintf("chr%s", i))
+}
+
+# chrreg <- bind_rows(chrreglist)
+# head(chrreg)
+# table(chrreg$seqnames)
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+# annotate chr 100bp bins with H3K27ac feature in each cell line, and calculate average H3K27ac scores across the 7 cell lines for each bin
+
+chrannot <- readRDS("chrannot.Rds")
+head(chrannot[[1]])
+scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf")
+
+chiqseqlist=list()
+acfinal=list()
+
+for (i in 1:22){
+  # merge score
+for(j in 1:7){
+  region <- GRanges(aclist[[j]])
+  wktmp <- annot(chrreglist[[i]], region) %>% group_by(regid) %>% 
+    mutate(chiqseqscore = mean(annot.score, na.rm = TRUE)) %>% 
+    distinct(seqnames, start, end, regid, chiqseqscore) 
+  
+    colnames(wktmp)[5] <- scorelist[[j]]
+  
+  chiqseqlist[[j]] <- chrreglist[[i]] %>% left_join(wktmp, by=c("seqnames", "start", "end", "regid"))
+}
+
+mergescore <- bind_cols(chiqseqlist) %>% 
+  dplyr::select(seqnames...1, start...2, end...3, regid...4, starts_with("score_") ) %>% 
+   rowwise() %>% 
+      mutate(ave_score = mean(c_across(score_gm12878:score_nhlf), na.rm = TRUE)) %>% 
+    ungroup()
+
+colnames(mergescore)[1:4] <- c("seqnames", "start", "end", "regid")
+
+
+# final merge
+acfinal[[i]] <- chrannot[[i]] %>% left_join(mergescore, by=c("seqnames", "start", "end", "regid")) 
+  
+}
+
+head(acfinal[[1]])
+summary(acfinal[[1]])
+saveRDS(acfinal, file = "H3K27ac_data.Rds")
+
+```
+
+```{r wgdata, echo=FALSE, warning=FALSE}
+# filtered for ave_score>100 & #CpGs>=5 bins
+
+datalist <- readRDS("H3K27ac_data.Rds")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+comblist <- list()
+for(i in 1:22){
+  comblist[[i]] <- datalist[[i]] %>% filter(ave_score>100) %>% 
+    rowwise() %>% 
+    mutate(n_sites=max(c_across(starts_with("n_sites_")))) %>% 
+    filter(n_sites>=5) %>% ungroup
+}
+head(comblist[[1]])
+ckdata <- bind_rows(comblist) 
+table(ckdata$seqnames)
+write_csv(ckdata, "H3K27ac_wgdata.csv")
+
+ckdata <- read_csv("H3K27ac_wgdata.csv")
+# 12970 bins total
+
+# remove duplicate, make wide form data
+wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
+# 6248
+write_csv(wkck, "H3K27ac_wide_unique.csv")
+
+# make long form data
+longdata <- list()
+for(i in 1:6){
+  longtmp <- wkck %>%  
+   mutate(ave_beta = rowMeans(wkck[,c(sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))], na.rm=TRUE)) %>% 
+    dplyr::select(seqnames, start, end, regid, sprintf("ave_pwd_%s", titlelist[[i]]), ave_beta) %>% 
+     mutate(whichpair=titlelist[[i]])
+
+colnames(longtmp)[5] <- c("ave_pwd")
+
+longdata[[i]] <- longtmp
+}
+
+longdataf <- bind_rows(longdata) 
+table(longdataf$whichpair)
+
+write_csv(longdataf, "H3K27ac_long_unique.csv")
+
+# make plots
+longdataf %>% 
+  ggplot(aes(x = ave_beta, y = ave_pwd)) +
+   geom_point(aes(color = whichpair)) +
+    ylim(0, 1) +
+     xlim(0, 1) +
+      scale_x_continuous(breaks = seq(0, 1, by = 0.5)) +
+  facet_wrap(whichpair ~ ., ncol=6) +
+  #facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average beta") +
+     ylab("Average pwd\n") +
+      ggtitle("High H3K27ac score, CpG rich region\n") + 
+       guides(color=guide_legend(" "))
+
+```
+
+```{r mkplotdata, echo=FALSE, warning=FALSE}
+# summary data by each chromosome
+datalist <- readRDS("H3K27ac_data.Rds")
+comblist <- list()
+for(i in 1:22){
+  comblist[[i]] <- mkdata(datalist[[i]], sprintf("chr%s", i), 100)
+  comblist[[i]]$rank <- i
+}
+
+ckdata <- bind_rows(comblist)
+write_csv(ckdata, "allchrH3K27ac_data.csv")
+
+```
+
+```{r mkplot, echo=FALSE, warning=FALSE}
+# make plots by chromosome
+ckdata <- read.csv("allchrH3K27ac_data.csv", header=TRUE, stringsAsFactors=FALSE)
+#nongene <- ckdata %>% distinct(name, nongene)
+#write_csv(nongene, "nongene.csv")
+ckdata %>% 
+  ggplot(aes(x = nongene, y = value)) +
+  geom_point(aes(color = name)) +
+    ylim(0, 0.2) +
+     xlim(0, 0.25) +
+  #facet_wrap(seqnames ~ ., ncol=6) +
+  facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average pwd of non-gene CpGs") +
+     ylab("Average pwd of CpG rich, high H3K27ac score region\n") +
+      ggtitle("High H3K27ac score, CpG rich region\n") + 
+       guides(color=guide_legend(" "))
+
+```
+
+# Make data for each cell line
+
+```{r mkdata1, echo=FALSE, warning=FALSE, eval=FALSE}
+datalist <- readRDS("H3K27ac_data.Rds")
+scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf", "ave_score")
+
+celllist <- list()
+for (j in 1:8){
+  for (i in 1:22){
+    celllist[[i]] <- mkdata1(datalist[[i]], scorelist[[j]], 100)
+   }
+
+  celldata <- bind_rows(celllist)
+
+write_csv(celldata, sprintf("%s_H3K27acdata.csv", scorelist[[j]]))
+}
+
+```
+
+
+
+
+
+

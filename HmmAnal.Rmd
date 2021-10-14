@@ -1,0 +1,287 @@
+---
+title: "HmmAnal"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library("genomation")
+
+```
+
+```{r func, echo=FALSE, warning=FALSE}
+
+# Annotation function
+annot <- function(dat, region){
+  wgpos <- GRanges(dat)
+  dm_annotated <- annotate_regions(
+    regions = wgpos,
+    annotations = region,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+  
+  dat_annot <- data.frame(dm_annotated)
+  
+  return(dat_annot)
+}
+
+# make chromosome region -- 100bp bins
+mkchrreg <- function(howlong, whichchr){
+  a <- rep(0, howlong)
+  b <- rep(0, howlong)
+  i <- 1
+  for(i in 1:howlong){
+    a[i] <- (i-1)*100+1
+    b[i] <- i*100
+    i+1
+  }
+  
+  table1 <- cbind(a, b)
+  colnames(table1) <- c("start", "end")
+  
+  chrreg <- as.data.frame(table1) %>% mutate(seqnames=whichchr, regid=row_number()) %>% 
+    dplyr::select(seqnames, start, end, regid)
+  
+  return(chrreg)
+}
+
+
+```
+
+
+
+```{r readbed, echo=FALSE, warning=FALSE}
+
+#  http://genome.ucsc.edu/cgi-bin/hgFileUi?db=hg19&g=wgEncodeBroadHmm
+
+read_bed <- function(dat){
+ck <- as.data.frame(fread(dat), header = F) %>% dplyr::select(V1:V4) %>% 
+  separate(V4, c("grp", "type"), "_", extra="merge", fill="left")
+colnames(ck) <- c("chr", "start", "end", "grp", "type")
+
+return(ck)
+}
+
+state <- read_bed("wgEncodeBroadHmmGm12878HMM.bed") %>% distinct(grp, type)
+write_csv(state, "Hmm_state.csv")
+
+celllist <- list("Gm12878", "H1hesc", "Hsmm", "Huvec", "K562", "Nhek", "Nhlf")
+
+chainObject1 <- import.chain("hg19ToHg38.over.chain")
+
+aclist <- list()
+for (i in 1:7){
+  wktmp <- read_bed(sprintf("wgEncodeBroadHmm%sHMM.bed", celllist[[i]]))
+  wktmprg <- GRanges(wktmp)
+  aclist[[i]] <- as.data.frame(liftOver(wktmprg, chainObject1)) %>% mutate(start = start +1)
+}
+
+comb <- read_csv("nongene.csv")
+
+```
+
+
+```{r, mkchr2regions, echo=FALSE, warning=FALSE, eval=FALSE}
+
+howlonglist <- list(2500000, 2422000, 1982000, 1903000, 1815000, 1708000, 1594000, 1451000, 1384000, 1338000,
+                    1351000, 1333000, 1144000, 1069000, 1020000, 902300, 832500, 802700, 590000, 643400, 467000, 508100)
+
+chrreglist <- list()
+
+for (i in 1:22){
+  chrreglist[[i]] <- mkchrreg(howlonglist[[i]], sprintf("chr%s", i))
+}
+
+```
+
+```{r mkdata, echo=FALSE, warning=FALSE, eval=FALSE}
+chrannot <- readRDS("chrannot.Rds")
+grplist <- list("grp_gm12878", "grp_h1hesc", "grp_hsmm", "grp_huvec", "grp_k562", "grp_nhec", "grp_nhlf")
+hmmlist <- list()
+hmmfinal <- list()
+
+for(i in 1:22){
+  
+for(j in 1:7){
+  region <- GRanges(aclist[[j]])
+  wktmp <- annot(chrreglist[[i]], region) %>% dplyr::select(seqnames, start, end, regid, annot.grp) 
+  names(wktmp)[5] <- sprintf("grp_%s", celllist[[j]])
+  
+  hmmlist[[j]] <- chrreglist[[i]] %>% left_join(wktmp, by=c("seqnames", "start", "end", "regid")) %>% distinct()
+}
+
+mergehmm <- Reduce(function(x, y) merge(x, y, all=TRUE), hmmlist)
+
+mergehmm2 <- mergehmm %>% filter_at(vars(starts_with("grp_")),any_vars(!is.na(.)))
+
+maxhmm <- cbind(mergehmm2, do.call(rbind, apply(mergehmm2[5:11], 1, function(x) {
+              x1 <- table(x)
+             data.frame(Count = max(x1), Names=names(x1)[which.max(x1)])})))
+
+# final merge
+hmmfinal[[i]] <- chrannot[[i]] %>% left_join(maxhmm, by=c("seqnames", "start", "end", "regid")) %>% filter(Count>=6)
+}
+
+# maxhmm <- mergehmm %>% 
+#  filter_at(vars(starts_with("grp_")),any_vars(!is.na(.))) %>% 
+#   rowwise() %>%
+#    mutate(New.Group = na.omit(vec_count(c_across(starts_with("grp_")), "location")) %>%
+#          slice_max(count, with_ties = FALSE) %>%
+#          pull(key))
+
+saveRDS(hmmfinal, file = "Hmm_data.Rds")
+
+```
+
+
+```{r sumdata, echo=FALSE, warning=FALSE, eval=FALSE}
+
+hmmfinal <- readRDS("Hmm_data.Rds")
+
+# summary for each chr
+hmmdata <- list()
+for(i in 1:22){
+  
+hmmdata[[i]] <- hmmfinal[[i]] %>% 
+  filter_at(vars(starts_with("n_sites_")),all_vars(!is.na(.))) %>% rowwise() %>% 
+    mutate(n_sites=max(c_across(starts_with("n_sites_")), na.rm = TRUE)) %>% 
+    ungroup %>% group_by(Names) %>% 
+    mutate(N1N2=mean(ave_pwd_N1N2),
+           JAJB=mean(ave_pwd_JAJB),
+           IAIB=mean(ave_pwd_IAIB),
+           DADB=mean(ave_pwd_DADB),
+           HAHB=mean(ave_pwd_HAHB),
+           MAMB=mean(ave_pwd_MAMB),
+           n_bins = length(regid)) %>% ungroup %>% 
+  distinct(seqnames, Names, n_bins, N1N2, JAJB, IAIB, DADB, HAHB, MAMB) %>% 
+   left_join(state, by=c("Names"="grp")) %>% 
+     mutate(statename=paste0(Names, "_", type)) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:MAMB) %>% 
+       left_join(comb, by = "name" ) 
+}
+saveRDS(hmmdata, file = "Hmmfinal_data.Rds")
+
+# summary for whole genome
+hmmdata_wg <- bind_rows(hmmfinal) %>% 
+  filter_at(vars(starts_with("n_sites_")),all_vars(!is.na(.))) %>% rowwise() %>% 
+    mutate(n_sites=max(c_across(starts_with("n_sites_")), na.rm = TRUE)) %>% 
+    ungroup
+
+write_csv(hmmdata_wg, "hmm_wg.csv")
+
+
+hmmdata_all <- hmmdata_wg %>% group_by(Names) %>% 
+    mutate(N1N2=mean(ave_pwd_N1N2),
+           JAJB=mean(ave_pwd_JAJB),
+           IAIB=mean(ave_pwd_IAIB),
+           DADB=mean(ave_pwd_DADB),
+           HAHB=mean(ave_pwd_HAHB),
+           MAMB=mean(ave_pwd_MAMB),
+           n_bins = length(regid), 
+           ave_n_sites = mean(n_sites),
+           var_n_sites = var(n_sites),
+           min_n_sites = min(n_sites),
+           max_n_sites = max(n_sites)) %>% ungroup %>% 
+  distinct(Names, n_bins, ave_n_sites, var_n_sites, min_n_sites, max_n_sites, N1N2, JAJB, IAIB, DADB, HAHB, MAMB) %>% 
+   left_join(state, by=c("Names"="grp")) %>% 
+     mutate(statename=paste0(Names, "_", type)) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:MAMB) %>% 
+       left_join(comb, by = "name" ) 
+
+write_csv(hmmdata_all, "hmmsum_wg.csv")
+
+```
+
+```{r mkplot, echo=FALSE, warning=FALSE}
+hmmdata_wg <- read_csv("hmm_wg.csv")
+summary(hmmdata_wg$Names)
+
+hmm1data <- hmmdata_wg %>% filter(Names == 1) %>% distinct()
+write_csv(hmm1data, "hmm1_wg.csv")
+
+hmm1data_unique <- hmm1data %>%  dplyr::select(seqnames, start, end, regid, n_sites, Names) %>% distinct()
+colnames(hmm1data_unique)[6] <- c("state")
+write_csv(hmm1data_unique, "hmm1_wg_unique.csv")
+# 85070
+
+hmm6data <- hmmdata_wg %>% filter(Names == 6) %>% distinct()
+write_csv(hmm6data, "hmm6_wg.csv")
+
+hmm6data_unique <- hmm6data %>%  dplyr::select(seqnames, start, end, regid, n_sites, Names) %>% distinct()
+colnames(hmm6data_unique)[6] <- c("state")
+write_csv(hmm6data_unique, "hmm6_wg_unique.csv")
+# 2639
+
+state <- state %>% mutate(Names = as.numeric(grp))
+
+hmmdata_wg %>% left_join(state, by=c("Names")) %>% 
+     mutate(statename=paste0(Names, "_", type)) %>%  
+  ggplot(aes(x = statename, y = n_sites)) +
+  geom_boxplot(aes(color=statename)) +
+  ggtitle("Number of CpGs in each bin") +
+  coord_flip() +
+   theme(legend.position = "none") 
+
+mode(hmmdata_wg$Names)
+mode(state$Names)
+
+hmmdata_all <- read_csv("hmmsum_wg.csv")
+
+  cat("\n Number of bins for each region\n")
+  forview <- hmmdata_all %>% dplyr::distinct(statename, n_bins)
+  print(forview)
+  
+hmmdata_all %>% mutate(rank=as.numeric(Names)) %>% 
+  ggplot(aes(x = nongene, y = value)) +
+  geom_point(aes(color = name)) +
+    ylim(0, 0.2) +
+     xlim(0, 0.25) +
+  #facet_wrap(Names ~ ., ncol=5) +
+  facet_wrap(facets = ~reorder(Names, rank), ncol=5) +
+    xlab("\n Average pwd of non-gene CpGs") +
+     ylab("Average pwd of Hmm region\n") +
+      ggtitle("Hmm region\n") + 
+       guides(color=guide_legend(" "))
+
+```
+
+```{r mkplot2, echo=FALSE, warning=FALSE}
+
+hmmdata <- readRDS("Hmmfinal_data.Rds")
+
+for (i in 1:22){
+  cat(sprintf("\n Number of bins for each region of Chr%s \n", i))
+  forview <- hmmdata[[i]] %>% distinct(statename, n_bins)
+  print(forview)
+  
+plot <- hmmdata[[i]] %>% mutate(rank=as.numeric(Names)) %>% 
+  ggplot(aes(x = nongene, y = value)) +
+  geom_point(aes(color = name)) +
+    ylim(0, 0.2) +
+     xlim(0, 0.25) +
+  #facet_wrap(Names ~ ., ncol=5) +
+  facet_wrap(facets = ~reorder(Names, rank), ncol=5) +
+    xlab("\n Average pwd of non-gene CpGs") +
+     ylab("Average pwd of Hmm region\n") +
+      ggtitle(sprintf("Chr%s Hmm region\n", i)) + 
+       guides(color=guide_legend(" "))
+
+print(plot)
+}
+
+```
+
+
+
+
