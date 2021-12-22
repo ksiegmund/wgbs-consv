@@ -56,7 +56,7 @@ return(datall)
 ```
 
 
-```{r}
+```{r mkmetdata}
 
  metdata <- read_met("AS1L1.multiple.deduplicated.bismark.cov.gz")
  cpgob <- read_pos("CpG_OB_AS1L1.multiple.deduplicated.txt.gz")
@@ -66,3 +66,33 @@ return(datall)
  #write.table(metdata_s1, "wg_s1n.bed", row.names = F, col.names = F, quote = F, sep = "\t")
 
  ···
+ 
+ # Make pwd bed file after making metdata for all 6 samples;
+ 
+ ```{r makedata pwd ucsc}
+gendf <- function(data){
+#data$pwd <- (data$num_met.x*data$num_unmet.y+data$num_met.y*data$num_unmet.x)/data$coverage.x/data$coverage.y
+  data$pwd <- abs(data$beta.x - data$beta.y)
+  df <- data %>% filter(coverage.x>4 & coverage.y>4) %>%  dplyr:: select(chr, start, end, pwd, beta.x, beta.y)
+return(df)
+}
+
+# S1-S4: N1-N2
+joins <- inner_join(metdata_s1, metdata_s4, by = c('chr', 'start', 'end'))
+df14pwd <- gendf(joins)
+summary(df14pwd)
+write.table(df14pwd, "wgdf14pwd.bed", row.names = F, col.names = F, quote = F, sep = "\t")
+
+# S2-S3: TA1-TB1
+joins <- inner_join(metdata_s2, metdata_s3, by = c('chr', 'start', 'end')) 
+df23pwd <- gendf(joins)
+summary(df23pwd)
+write.table(df23pwd, "wgdf23pwd.bed", row.names = F, col.names = F, quote = F, sep = "\t")
+
+# S5-S6: TA2-TB2
+joins <- inner_join(metdata_s5, metdata_s6, by = c('chr', 'start', 'end'))
+df56pwd <- gendf(joins)
+summary(df56pwd)
+write.table(df56pwd, "wgdf56pwd.bed", row.names = F, col.names = F, quote = F, sep = "\t")
+
+```
