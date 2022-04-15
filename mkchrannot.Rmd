@@ -100,14 +100,16 @@ return(annotchr_generegion)
 
 
 ```{r importdata, echo=FALSE, warning=FALSE}
-wgdf14pwd <- read_pwd("wgdf14cpwdm.bed")
-wgdf23pwd <- read_pwd("wgdf23cpwdm.bed")
-wgdf56pwd <- read_pwd("wgdf56cpwdm.bed")
-wgdf12pwd <- read_pwd("wgdf12pwdm.bed")
-wgdf34pwd <- read_pwd("wgdf34pwdm.bed") 
-wgdf56npwd <- read_pwd("wgdf56pwdm.bed") 
+wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed")
+wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed")
+wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed")
+wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed")
+wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
+ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
+ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
 
-generef <- readGFF("hg38.ncbiRefSeq.gtf.gz")
+generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 
 uniquetranscript <- generef %>% filter(type=="transcript") %>% 
   mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
@@ -144,9 +146,9 @@ generef3 <- rbind(generef2, geneTSS200, geneTSS2000) %>% filter(type!="CDS")
 table(generef3$type)
 gene_region <- GRanges(generef3)
 
-#txdb <- makeTxDbFromGFF('hg38.ncbiRefSeq.gtf.gz')
+txdb <- makeTxDbFromGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 ## get intron information
-#all.introns <- intronicParts(txdb)
+all.introns <- intronicParts(txdb)
 
 ```
 
@@ -159,6 +161,7 @@ chrreglist <- list()
 
 for (i in 1:22){
   chrreglist[[i]] <- mkchrreg(howlonglist[[i]], sprintf("chr%s", i))
+  
 }
 
 # chrreg <- bind_rows(chrreglist)
@@ -173,21 +176,23 @@ for (i in 1:22){
 
 # merge chr region, pwd and gene annotation
 
-comparelist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd)
-namelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+comparelist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd)
+namelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN")
 
-olddatalist <- list()
-for (i in 1:22){
-  olddatalist[[i]] <- read.csv(sprintf("Chr%s_data.csv", i), header = TRUE, stringsAsFactors=FALSE) %>% 
-  dplyr::select(seqnames, start, end, regid, annot.type, annot.gene_name)
-}
+#olddatalist <- list()
+#for (i in 1:22){
+#  olddatalist[[i]] <- read.csv(sprintf("../chrdata/ChrCSV/Chr%s_data.csv", i), header = TRUE, stringsAsFactors=FALSE) %>% 
+#  dplyr::select(seqnames, start, end, regid, annot.type, annot.gene_name)
+#}
 
 pwdlist=list()
 chrannot=list()
 
 for (i in 1:22){
+  print(i)
 # merge pwd
-for(k in 1:6){
+for(k in 1:length(namelist)){
+  print(k)
   chrregion <- GRanges(chrreglist[[i]])
 
   wktmp <- annot(comparelist[[k]], chrregion) %>% group_by(annot.regid) %>% 
@@ -209,15 +214,26 @@ colnames(mergepwd)[1:4] <- c("seqnames", "start", "end", "regid")
   
 # final merge
 chrannot[[i]] <- chrreglist[[i]] %>% 
-  left_join(mergepwd, by=c("seqnames", "start", "end", "regid")) %>% 
-   left_join(olddatalist[[i]], by=c("seqnames", "start", "end", "regid"))
+  left_join(mergepwd, by=c("seqnames", "start", "end", "regid")) #%>% 
+   #left_join(olddatalist[[i]], by=c("seqnames", "start", "end", "regid"))
 
 }
 
-ck <- chrannot[[1]]
+
+#annotate the chromosomes
+chrannot_n <- lapply(chrannot,annotregion)
+
+
+#final merge annot with data
+for (i in 1:length(chrannot_n)){
+  chrannot_n[[i]] <- chrannot[[i]] %>%left_join(chrannot_n[[i]],by=c("seqnames", "start", "end", "regid"))
+}
+
+
+ck <- chrannot_n[[1]]
 summary(ck)
 
-saveRDS(chrannot, file = "chrannot.Rds")
+saveRDS(chrannot_n, file = "chrannot.Rds")
 
 ```
 

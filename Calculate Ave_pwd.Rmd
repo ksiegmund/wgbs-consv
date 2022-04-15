@@ -1,0 +1,178 @@
+---
+title: "Calculate Ave_pwd"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(slider)
+library(ggplot2)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library(ggridges)
+library(viridis)
+library("ROCR")
+
+```
+
+```{r funs, echo=FALSE, warning=FALSE}
+
+read_pwd <- function(x){
+  dat <- fread(x, header = F)
+  colnames(dat) <- c("chr", "start", "end", "pwd", "beta.x", "beta.y")
+  dat <- dat %>% arrange(chr, start) %>% group_by(chr) %>% mutate(rank = row_number()) 
+  #%>% filter(chr=="chr19")
+  return(dat)
+}
+
+# Annotation function
+annot <- function(dat, region){
+  wgpos <- GRanges(dat)
+  dm_annotated <- annotate_regions(
+    regions = wgpos,
+    annotations = region,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+  
+  dat_annot <- data.frame(dm_annotated)
+  
+  return(dat_annot)
+}
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+
+wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed") 
+wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed") 
+wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed") 
+wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed") 
+wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
+ENJNnpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
+ENINnpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+generef <- readGFF("~/My-Nhi Nguyen/DNAm/Caihong/DepMap/hg38.ncbiRefSeq.gtf.gz")
+
+uniquetranscript <- generef %>% filter(type=="transcript") %>% 
+  mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+   group_by(gene_id) %>% 
+    mutate(maxtran = max(region_length)) %>% 
+     filter(region_length==maxtran) %>% ungroup %>% 
+       group_by(gene_id) %>% mutate(rank=row_number()) %>% filter(rank==1) %>% 
+        dplyr::select(gene_id, transcript_id)
+
+generef2 <- generef %>% right_join(uniquetranscript,by=c("gene_id", "transcript_id")) %>% mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+wholegene <- generef2 %>% dplyr::filter(type=="transcript") %>% 
+  #mutate(tss_start = ifelse(strand=="+", start - 200, start),
+        mutate(tss_start = ifelse(strand=="+", start - 2000, start), 
+          #tss_end = ifelse(strand=="+", end, end + 200),
+          tss_end = ifelse(strand=="+", end, end + 2000),
+           region_length = tss_end - tss_start +1, 
+            tss_type = "wholegene") %>% 
+               dplyr::select(-start, -end, -type) %>% 
+                mutate(start=tss_start, end=tss_end, type=tss_type) %>% 
+                 dplyr::select(-tss_start, -tss_end, -tss_type) %>%
+                  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+gene_region <- GRanges(wholegene)
+
+```
+
+# N1-N2
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf14pwd$pwd)
+ingene <- annot(wgdf14pwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf14pwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# JA-JB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf23pwd$pwd)
+ingene <- annot(wgdf23pwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf23pwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# IA-IB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf56pwd$pwd)
+ingene <- annot(wgdf56pwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf56pwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# DA-DB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf12pwd$pwd)
+ingene <- annot(wgdf12pwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf12pwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# HA-HB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf34pwd$pwd)
+ingene <- annot(wgdf34pwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf34pwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# MA-MB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(wgdf56npwd$pwd)
+ingene <- annot(wgdf56npwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- wgdf56npwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# EN-JN
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(ENJNnpwd$pwd)
+ingene <- annot(ENJNnpwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- ENJNnpwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+# EN-IN
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(ENINnpwd$pwd)
+ingene <- annot(ENINnpwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- ENINnpwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```

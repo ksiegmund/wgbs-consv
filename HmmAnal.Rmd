@@ -73,8 +73,8 @@ colnames(ck) <- c("chr", "start", "end", "grp", "type")
 return(ck)
 }
 
-state <- read_bed("wgEncodeBroadHmmGm12878HMM.bed") %>% distinct(grp, type)
-write_csv(state, "Hmm_state.csv")
+state <- read_bed("../Hmm/wgEncodeBroadHmmGm12878HMM.bed") %>% distinct(grp, type)
+write_csv(state, "../Hmm/Hmm_state.csv")
 
 celllist <- list("Gm12878", "H1hesc", "Hsmm", "Huvec", "K562", "Nhek", "Nhlf")
 
@@ -82,12 +82,12 @@ chainObject1 <- import.chain("hg19ToHg38.over.chain")
 
 aclist <- list()
 for (i in 1:7){
-  wktmp <- read_bed(sprintf("wgEncodeBroadHmm%sHMM.bed", celllist[[i]]))
+  wktmp <- read_bed(sprintf("../Hmm/wgEncodeBroadHmm%sHMM.bed", celllist[[i]]))
   wktmprg <- GRanges(wktmp)
   aclist[[i]] <- as.data.frame(liftOver(wktmprg, chainObject1)) %>% mutate(start = start +1)
 }
 
-comb <- read_csv("nongene.csv")
+comb <- read_csv("../Hmm/nongene.csv")
 
 ```
 
@@ -106,14 +106,15 @@ for (i in 1:22){
 ```
 
 ```{r mkdata, echo=FALSE, warning=FALSE, eval=FALSE}
-chrannot <- readRDS("chrannot.Rds")
+chrannot <- readRDS("../chrdata/chrannot.Rds")
 grplist <- list("grp_gm12878", "grp_h1hesc", "grp_hsmm", "grp_huvec", "grp_k562", "grp_nhec", "grp_nhlf")
 hmmlist <- list()
 hmmfinal <- list()
 
 for(i in 1:22){
-  
+  print(i)
 for(j in 1:7){
+  print(j)
   region <- GRanges(aclist[[j]])
   wktmp <- annot(chrreglist[[i]], region) %>% dplyr::select(seqnames, start, end, regid, annot.grp) 
   names(wktmp)[5] <- sprintf("grp_%s", celllist[[j]])
@@ -140,19 +141,19 @@ hmmfinal[[i]] <- chrannot[[i]] %>% left_join(maxhmm, by=c("seqnames", "start", "
 #          slice_max(count, with_ties = FALSE) %>%
 #          pull(key))
 
-saveRDS(hmmfinal, file = "Hmm_data.Rds")
+saveRDS(hmmfinal, file = "../Hmm/Hmm_data.Rds")
 
 ```
 
 
 ```{r sumdata, echo=FALSE, warning=FALSE, eval=FALSE}
 
-hmmfinal <- readRDS("Hmm_data.Rds")
+hmmfinal <- readRDS("../Hmm/Hmm_data.Rds")
 
 # summary for each chr
 hmmdata <- list()
 for(i in 1:22){
-  
+  print(i)
 hmmdata[[i]] <- hmmfinal[[i]] %>% 
   filter_at(vars(starts_with("n_sites_")),all_vars(!is.na(.))) %>% rowwise() %>% 
     mutate(n_sites=max(c_across(starts_with("n_sites_")), na.rm = TRUE)) %>% 
@@ -163,14 +164,16 @@ hmmdata[[i]] <- hmmfinal[[i]] %>%
            DADB=mean(ave_pwd_DADB),
            HAHB=mean(ave_pwd_HAHB),
            MAMB=mean(ave_pwd_MAMB),
+           ENIN=mean(ave_pwd_ENIN),
+           ENJN=mean(ave_pwd_ENJN),
            n_bins = length(regid)) %>% ungroup %>% 
-  distinct(seqnames, Names, n_bins, N1N2, JAJB, IAIB, DADB, HAHB, MAMB) %>% 
+  distinct(seqnames, Names, n_bins, N1N2, JAJB, IAIB, DADB, HAHB, MAMB, ENIN, ENJN) %>% 
    left_join(state, by=c("Names"="grp")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>% 
-      arrange(Names) %>% pivot_longer(N1N2:MAMB) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:ENJN) %>% 
        left_join(comb, by = "name" ) 
 }
-saveRDS(hmmdata, file = "Hmmfinal_data.Rds")
+saveRDS(hmmdata, file = "../Hmm/Hmmfinal_data.Rds")
 
 # summary for whole genome
 hmmdata_wg <- bind_rows(hmmfinal) %>% 
@@ -178,7 +181,7 @@ hmmdata_wg <- bind_rows(hmmfinal) %>%
     mutate(n_sites=max(c_across(starts_with("n_sites_")), na.rm = TRUE)) %>% 
     ungroup
 
-write_csv(hmmdata_wg, "hmm_wg.csv")
+write_csv(hmmdata_wg, "../Hmm/hmm_wg.csv")
 
 
 hmmdata_all <- hmmdata_wg %>% group_by(Names) %>% 
@@ -188,42 +191,44 @@ hmmdata_all <- hmmdata_wg %>% group_by(Names) %>%
            DADB=mean(ave_pwd_DADB),
            HAHB=mean(ave_pwd_HAHB),
            MAMB=mean(ave_pwd_MAMB),
+           ENIN=mean(ave_pwd_ENIN),
+           ENJN=mean(ave_pwd_ENJN),
            n_bins = length(regid), 
            ave_n_sites = mean(n_sites),
            var_n_sites = var(n_sites),
            min_n_sites = min(n_sites),
            max_n_sites = max(n_sites)) %>% ungroup %>% 
-  distinct(Names, n_bins, ave_n_sites, var_n_sites, min_n_sites, max_n_sites, N1N2, JAJB, IAIB, DADB, HAHB, MAMB) %>% 
+  distinct(Names, n_bins, ave_n_sites, var_n_sites, min_n_sites, max_n_sites, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENIN,ENJN) %>% 
    left_join(state, by=c("Names"="grp")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>% 
-      arrange(Names) %>% pivot_longer(N1N2:MAMB) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:ENJN) %>% 
        left_join(comb, by = "name" ) 
 
-write_csv(hmmdata_all, "hmmsum_wg.csv")
+write_csv(hmmdata_all, "../Hmm/hmmsum_wg.csv")
 
 ```
 
 ```{r mkplot, echo=FALSE, warning=FALSE}
-hmmdata_wg <- read_csv("hmm_wg.csv")
+hmmdata_wg <- read_csv("../Hmm/hmm_wg.csv")
 summary(hmmdata_wg$Names)
 
 hmm1data <- hmmdata_wg %>% filter(Names == 1) %>% distinct()
-write_csv(hmm1data, "hmm1_wg.csv")
+write_csv(hmm1data, "../Hmm/hmm1_wg.csv")
 
 hmm1data_unique <- hmm1data %>%  dplyr::select(seqnames, start, end, regid, n_sites, Names) %>% distinct()
 colnames(hmm1data_unique)[6] <- c("state")
-write_csv(hmm1data_unique, "hmm1_wg_unique.csv")
+write_csv(hmm1data_unique, "../Hmm/hmm1_wg_unique.csv")
 # 85070
 
 hmm6data <- hmmdata_wg %>% filter(Names == 6) %>% distinct()
-write_csv(hmm6data, "hmm6_wg.csv")
+write_csv(hmm6data, "../Hmm/hmm6_wg.csv")
 
 hmm6data_unique <- hmm6data %>%  dplyr::select(seqnames, start, end, regid, n_sites, Names) %>% distinct()
 colnames(hmm6data_unique)[6] <- c("state")
-write_csv(hmm6data_unique, "hmm6_wg_unique.csv")
+write_csv(hmm6data_unique, "../Hmm/hmm6_wg_unique.csv")
 # 2639
 
-state <- state %>% mutate(Names = as.numeric(grp))
+state <- state %>% mutate(Names = as.factor(grp))
 
 hmmdata_wg %>% left_join(state, by=c("Names")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>%  
@@ -236,7 +241,7 @@ hmmdata_wg %>% left_join(state, by=c("Names")) %>%
 mode(hmmdata_wg$Names)
 mode(state$Names)
 
-hmmdata_all <- read_csv("hmmsum_wg.csv")
+hmmdata_all <- read_csv("../Hmm/hmmsum_wg.csv")
 
   cat("\n Number of bins for each region\n")
   forview <- hmmdata_all %>% dplyr::distinct(statename, n_bins)
@@ -258,7 +263,7 @@ hmmdata_all %>% mutate(rank=as.numeric(Names)) %>%
 
 ```{r mkplot2, echo=FALSE, warning=FALSE}
 
-hmmdata <- readRDS("Hmmfinal_data.Rds")
+hmmdata <- readRDS("../Hmm/Hmmfinal_data.Rds")
 
 for (i in 1:22){
   cat(sprintf("\n Number of bins for each region of Chr%s \n", i))

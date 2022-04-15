@@ -20,7 +20,7 @@ library(rtracklayer)
 require(readr)
 library(ggridges)
 library("genomation")
-library("ROCR")
+library(ROCR)
 library("ggpubr")
 source("H3K27func.R")
 
@@ -36,11 +36,15 @@ source("H3K27func.R")
 
 celllist <- list("Gm12878", "H1hesc", "Hsmm", "Huvec", "K562", "Nhek", "Nhlf")
 
+#download.file("http://hgdownload.cse.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz",
+#"hg19ToHg38.over.chain.gz")
+#system("gzip -d hg19ToHg38.over.chain.gz")
+
 chainObject1 <- import.chain("hg19ToHg38.over.chain")
 
 ctcflist <- list()
 for (i in 1:7){
-  wktmp <- import.bw(sprintf("wgEncodeBroadHistone%sCtcfStdSig.bigWig", celllist[[i]]))
+  wktmp <- import.bw(sprintf("../CTCF/wgEncodeBroadHistone%sCtcfStdSig.bigWig", celllist[[i]]))
   ctcflist[[i]] <- as.data.frame(liftOver(wktmp, chainObject1))
 }
 
@@ -76,15 +80,17 @@ for (i in 1:22){
 
 # annotate chr 100bp bins with ctcf feature in each cell line, and calculate average ctcf scores across the 7 cell lines for each bin
 
-chrannot <- readRDS("chrannot.Rds")
+chrannot <- readRDS("../chrdata/chrannot.Rds")
 scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf")
 
 chiqseqlist=list()
 ctcffinal=list()
 
 for (i in 1:22){
+  print(i)
   # merge score
 for(j in 1:7){
+  print(j)
   region <- GRanges(ctcflist[[j]])
   wktmp <- annot(chrreglist[[i]], region) %>% group_by(regid) %>% 
     mutate(chiqseqscore = mean(annot.score, na.rm = TRUE)) %>% 
@@ -109,7 +115,7 @@ ctcffinal[[i]] <- chrannot[[i]] %>% left_join(mergescore, by=c("seqnames", "star
 }
 
 head(ctcffinal[[22]])
-saveRDS(ctcffinal, file = "ctcf_data.Rds")
+saveRDS(ctcffinal, file = "../CTCF/ctcf_data.Rds")
 
 ```
 
@@ -117,8 +123,8 @@ saveRDS(ctcffinal, file = "ctcf_data.Rds")
 
 # filtered for ave_score>100 & #CpGs>=5 bins
 
-datalist <- readRDS("ctcf_data.Rds")
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+datalist <- readRDS("../CTCF/ctcf_data.Rds")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB","ENJN","ENIN")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- datalist[[i]] %>% filter(ave_score>100) %>% 
@@ -129,18 +135,18 @@ for(i in 1:22){
 head(comblist[[1]])
 ckdata <- bind_rows(comblist)
 table(ckdata$seqnames)
-write_csv(ckdata, "ctcf_wgdata.csv")
+write_csv(ckdata, "../CTCF/ctcf_wgdata.csv")
 
 # remove duplicate, make wide form data
 ckdata <- read_csv("ctcf_wgdata.csv")
 # 11511 bins total
 wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
 # 7991
-write_csv(wkck, "ctcf_wide_unique.csv")
+write_csv(wkck, "../CTCF/ctcf_wide_unique.csv")
 
 # make long form data
 longdata <- list()
-for(i in 1:6){
+for(i in 1:length(titlelist)){
   longtmp <- wkck %>%  
    mutate(ave_beta = rowMeans(wkck[,c(sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))], na.rm=TRUE)) %>% 
     dplyr::select(seqnames, start, end, regid, sprintf("ave_pwd_%s", titlelist[[i]]), ave_beta) %>% 
@@ -154,7 +160,7 @@ longdata[[i]] <- longtmp
 longdataf <- bind_rows(longdata) 
 table(longdataf$whichpair)
 
-write_csv(longdataf, "ctcf_long_unique.csv")
+write_csv(longdataf, "../CTCF/ctcf_long_unique.csv")
 
 ```
 
@@ -168,8 +174,9 @@ for(i in 1:22){
   comblist[[i]]$rank <- i
 }
 
+comblist[[1]]
 ckdata <- bind_rows(comblist)
-write_csv(ckdata, "allchrCtcf_data.csv")
+write_csv(ckdata, "../CTCF/allchrCtcf_data.csv")
 
 ```
 

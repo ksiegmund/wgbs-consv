@@ -39,7 +39,7 @@ chainObject1 <- import.chain("hg19ToHg38.over.chain")
 
 melist <- list()
 for (i in 1:7){
-  wktmp <- import.bw(sprintf("wgEncodeBroadHistone%sH3k27me3StdSig.bigWig", celllist[[i]]))
+  wktmp <- import.bw(sprintf("../H3K27me3/wgEncodeBroadHistone%sH3k27me3StdSig.bigWig", celllist[[i]]))
   melist[[i]] <- as.data.frame(liftOver(wktmp, chainObject1))
 }
 
@@ -84,15 +84,17 @@ for (i in 1:22){
 
 # annotate chr 100bp bins with H3K27me3 feature in each cell line, and calculate average H3K27me3 scores across the 7 cell lines for each bin
 
-chrannot <- readRDS("chrannot.Rds")
+chrannot <- readRDS("../chrdata/chrannot.Rds")
 scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf")
 
 chiqseqlist=list()
 mefinal=list()
 
 for (i in 1:22){
+  print(i)
   # merge score
 for(j in 1:7){
+  print(j)
   region <- GRanges(melist[[j]])
   wktmp <- annot(chrreglist[[i]], region) %>% group_by(regid) %>% 
     mutate(chiqseqscore = mean(annot.score, na.rm = TRUE)) %>% 
@@ -116,7 +118,7 @@ mefinal[[i]] <- chrannot[[i]] %>% left_join(mergescore, by=c("seqnames", "start"
 }
 
 head(mefinal[[1]])
-saveRDS(mefinal, file = "H3K27me3_data.Rds")
+saveRDS(mefinal, file = "../H3K27me3/H3K27me3_data.Rds")
 
 ```
 
@@ -124,8 +126,8 @@ saveRDS(mefinal, file = "H3K27me3_data.Rds")
 
 # filtered for ave_score>30 & #CpGs>=5 bins
 
-datalist <- readRDS("H3K27me3_data.Rds")
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+datalist <- readRDS("../H3K27me3/H3K27me3_data.Rds")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN","ENIN")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- datalist[[i]] %>% filter(ave_score>30) %>% 
@@ -136,18 +138,18 @@ for(i in 1:22){
 head(comblist[[1]])
 ckdata <- bind_rows(comblist)
 table(ckdata$seqnames)
-write_csv(ckdata, "H3K27me3_wgdata.csv")
+write_csv(ckdata, "../H3K27me3/H3K27me3_wgdata.csv")
 
 # remove duplicate, make wide form data
-ckdata <- read_csv("H3K27me3_wgdata.csv")
-# 9876 bins total
+ckdata <- read_csv("../H3K27me3/H3K27me3_wgdata.csv")
+# 9808 bins total
 wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
-# 7567
-write_csv(wkck, "H3K27me3_wide_unique.csv")
+# 7519
+write_csv(wkck, "../H3K27me3/H3K27me3_wide_unique.csv")
 
 # make long form data
 longdata <- list()
-for(i in 1:6){
+for(i in 1:length(titlelist)){
   longtmp <- wkck %>%  
    mutate(ave_beta = rowMeans(wkck[,c(sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))], na.rm=TRUE)) %>% 
     dplyr::select(seqnames, start, end, regid, sprintf("ave_pwd_%s", titlelist[[i]]), ave_beta) %>% 
@@ -161,7 +163,7 @@ longdata[[i]] <- longtmp
 longdataf <- bind_rows(longdata) 
 table(longdataf$whichpair)
 
-write_csv(longdataf, "H3K27me3_long_unique.csv")
+write_csv(longdataf, "../H3K27me3/H3K27me3_long_unique.csv")
 
 
 ```
@@ -169,7 +171,7 @@ write_csv(longdataf, "H3K27me3_long_unique.csv")
 
 ```{r mkplotdata, echo=FALSE, warning=FALSE}
 # summary data by each chromosome
-datalist <- readRDS("H3K27me3_data.Rds")
+datalist <- readRDS("../H3K27me3/H3K27me3_data.Rds")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- mkdata(datalist[[i]], sprintf("chr%s", i), 30)
@@ -177,7 +179,7 @@ for(i in 1:22){
 }
 
 ckdata <- bind_rows(comblist)
-write_csv(ckdata, "allchrH3K27me3_data.csv")
+write_csv(ckdata, "../H3K27me3/allchrH3K27me3_data.csv")
 
 ```
 

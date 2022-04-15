@@ -28,13 +28,15 @@ source("depmapWiganal.R")
 
 ```{r importdata, echo=FALSE, warning=FALSE}
 
-wgdf14pwd <- read_pwd("wgdf14cpwdm.bed") 
-wgdf23pwd <- read_pwd("wgdf23cpwdm.bed") 
-wgdf56pwd <- read_pwd("wgdf56cpwdm.bed") 
-wgdf12pwd <- read_pwd("wgdf12pwdm.bed") 
-wgdf34pwd <- read_pwd("wgdf34pwdm.bed") 
-wgdf56npwd <- read_pwd("wgdf56pwdm.bed") 
-generef <- readGFF("hg38.ncbiRefSeq.gtf.gz")
+wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed") 
+wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed") 
+wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed") 
+wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed") 
+wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
+ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
+ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 
 uniquetranscript <- generef %>% filter(type=="transcript") %>% 
   mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
@@ -67,14 +69,14 @@ tss200region <- GRanges(geneTSS200)
 
 ```{r, echo=FALSE, warning=FALSE}
 
-datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd)
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
-alist <- list("N1", "JA", "IA", "DA", "HA", "MA")
-blist <- list("N2", "JB", "IB", "DB", "HB", "MB")
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN","ENIN")
+alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN")
+blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN")
 
 avebeta_tss200 <- list()
 
-for (i in 1:6){
+for (i in 1:length(datlist)){
   
 ck <- annot(datlist[[i]], tss200region)
 
@@ -114,25 +116,25 @@ avebeta_tss200[[i]] <- ck2
 }
 
 ave_beta_tss200 <- bind_rows(avebeta_tss200)
-write_csv(ave_beta_tss200, "ave_beta_tss200.csv")
+write_csv(ave_beta_tss200, "../AveBeta/ave_beta_tss200.csv")
 
 # Exclude chrX & chrY
-wktmp <- read_csv("ave_beta_tss200.csv") %>% filter(annot.seqnames!="chrX" & annot.seqnames!="chrY") %>% 
+wktmp <- read_csv("../AveBeta/ave_beta_tss200.csv") %>% filter(annot.seqnames!="chrX" & annot.seqnames!="chrY") %>% 
 rowwise() %>%  mutate(ave_beta = mean(c(ave_methy_a, ave_methy_b))) %>% ungroup()
-write_csv(wktmp, "ave_beta_tss200.csv")
+write_csv(wktmp, "../AveBeta/ave_beta_tss200.csv")
 
 # unique
-wktmp <- read_csv("ave_beta_tss200.csv") %>% distinct(annot.seqnames, annot.start, annot.end, ave_pwd, ave_beta, whichpair)
+wktmp <- read_csv("../AveBeta/ave_beta_tss200.csv") %>% distinct(annot.seqnames, annot.start, annot.end, ave_pwd, ave_beta, whichpair)
 table(wktmp$whichpair)
-write_csv(wktmp, "ave_beta_tss200_long_unique.csv")
+write_csv(wktmp, "../AveBeta/ave_beta_tss200_long_unique.csv")
 
 # make wide form data for pairwise correlation test
 
-wktmp <- read_csv("ave_beta_tss200.csv")
+wktmp <- read_csv("../AveBeta/ave_beta_tss200.csv")
 table(wktmp$whichpair)
 
 tsslist <- list()
-for(i in 1:6){
+for(i in 1:length(titlelist)){
   ck <- wktmp %>% filter(whichpair==titlelist[[i]]) %>% dplyr::select(annot.seqnames, annot.start, annot.end, ave_methy_a, ave_methy_b, ave_pwd, ave_beta)
   colnames(ck) <- c("seqnames", "start", "end", sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]), sprintf("ave_pwd_%s", titlelist[[i]]), sprintf("ave_beta_%s", titlelist[[i]]))
   tsslist[[i]] <- ck
@@ -144,9 +146,11 @@ tss200_pwdall <- tsslist[[1]] %>%
   inner_join(tsslist[[3]], by=c("seqnames", "start", "end")) %>%
   inner_join(tsslist[[4]], by=c("seqnames", "start", "end")) %>%
   inner_join(tsslist[[5]], by=c("seqnames", "start", "end")) %>%
-  inner_join(tsslist[[6]], by=c("seqnames", "start", "end")) %>% distinct()
+  inner_join(tsslist[[6]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[7]], by=c("seqnames", "start", "end")) %>% 
+  inner_join(tsslist[[8]], by=c("seqnames", "start", "end")) %>% distinct()
 
-write_csv(tss200_pwdall, "ave_beta_tss200_wide_unique.csv")
+write_csv(tss200_pwdall, "../AveBeta/ave_beta_tss200_wide_unique.csv")
 
 ```
 

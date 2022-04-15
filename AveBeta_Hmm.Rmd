@@ -32,25 +32,25 @@ source("H3K27func.R")
 
 ```{r, echo=FALSE, warning=FALSE, eval=FALSE, eval=FALSE}
 
-datalist <- readRDS("Hmm_data.Rds")
+datalist <- readRDS("../Hmm/Hmm_data.Rds")
 
 wkhmm <- bind_rows(datalist) %>% filter_at(vars(starts_with("n_sites_")),all_vars(!is.na(.))) %>% rowwise() %>% 
     mutate(n_sites=max(c_across(starts_with("n_sites_")), na.rm = TRUE)) %>% 
     ungroup 
 
-write_csv(wkhmm, "selectedbins_Hmm.csv")
+write_csv(wkhmm, "../AveBeta/selectedbins_Hmm.csv")
 
 ```
 
 ```{r test, echo=FALSE, warning=FALSE}
 
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN","ENIN")
 
-wktmp <- read_csv("selectedbins_Hmm.csv")
+wktmp <- read_csv("../AveBeta/selectedbins_Hmm.csv")
 head(wktmp)
 
 longdata <- list()
-for(i in 1:6){
+for(i in 1:length(titlelist)){
   longtmp <- wktmp %>%  
    mutate(ave_beta = rowMeans(wktmp[,c(sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))], na.rm=TRUE)) %>% 
     dplyr::select(seqnames, start, end, regid, sprintf("ave_pwd_%s", titlelist[[i]]), ave_beta, Names) %>% 
@@ -63,7 +63,7 @@ longdata[[i]] <- longtmp
 
 longdataf <- bind_rows(longdata) %>% distinct()
 
-write_csv(longdataf, "Hmm_long_unique.csv")
+write_csv(longdataf, "../AveBeta/Hmm_long_unique.csv")
 
 summary(longdataf)
 mode(longdataf$Names)
@@ -91,11 +91,11 @@ print(plot)
 
 ```{r mkplotpre, echo=FALSE, warning=FALSE}
 
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB")
-alist <- list("N1", "JA", "IA", "DA", "HA", "MA")
-blist <- list("N2", "JB", "IB", "DB", "HB", "MB")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB",  "ENJN","ENIN")
+alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN")
+blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN")
 
-selectbins <- read_csv("selectedbins_Hmm.csv")
+selectbins <- read_csv("../AveBeta/selectedbins_Hmm.csv")
 table(selectbins$Names)
 
 ```
@@ -104,7 +104,7 @@ table(selectbins$Names)
 
 ```{r mkplot, echo=FALSE, warning=FALSE}
 
-for (i in 1:6){
+for (i in 1:length(titlelist)){
   ck <- selectbins %>% dplyr::select(seqnames, start, end, Names, sprintf("ave_pwd_%s", titlelist[[i]]), sprintf("ave_beta1_%s", titlelist[[i]]), sprintf("ave_beta2_%s", titlelist[[i]]))
   
   colnames(ck)[5:7] <- c("ave_pwd", "ave_beta1", "ave_beta2")

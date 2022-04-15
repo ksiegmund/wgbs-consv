@@ -53,11 +53,13 @@ mkdata <- function(dat, whichchr, minvalue){
            IAIB=mean(ave_pwd_IAIB),
            DADB=mean(ave_pwd_DADB),
            HAHB=mean(ave_pwd_HAHB),
-           MAMB=mean(ave_pwd_MAMB)) %>% 
-    distinct(N1N2, JAJB, IAIB, DADB, HAHB, MAMB) %>% 
-    pivot_longer(N1N2:MAMB)
+           MAMB=mean(ave_pwd_MAMB),
+           ENJN=mean(ave_pwd_ENJN),
+           ENIN=mean(ave_pwd_ENIN)) %>% 
+    distinct(N1N2, JAJB, IAIB, DADB, HAHB, MAMB, ENJN,ENIN ) %>% 
+    pivot_longer(N1N2:ENIN)
   
-  nongene <- c(0.11473, 0.21769, 0.11609, 0.11547, 0.13374, 0.10755)
+  nongene <- c(0.11613, 0.22246, 0.11743, 0.11654, 0.13507, 0.10755, 0.11797,0.12245)
   nogenedat <- as.data.frame(nongene)
   
   comb <- cbind(wkdata, nogenedat)

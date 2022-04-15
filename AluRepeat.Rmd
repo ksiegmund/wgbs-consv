@@ -1,0 +1,328 @@
+---
+title: "AluRepeat"
+output: html_document
+---
+
+# {.tabset}
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(slider)
+library(ggplot2)
+library(readxl)
+library(liftOver)
+library(annotatr)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(data.table)
+library(xlsx)
+library(rtracklayer)
+require(readr)
+library(ggridges)
+library(ggstatsplot)
+library(ggpubr)
+
+```
+
+```{r func, echo=FALSE, warning=FALSE}
+
+read_pwd <- function(x){
+  dat <- fread(x, header = F)
+  colnames(dat) <- c("chr", "start", "end", "pwd", "beta.x", "beta.y")
+  dat <- as.data.frame(dat)
+  return(dat)
+}
+
+# Annotation function
+annot <- function(dat, region){
+  wgpos <- GRanges(dat)
+  dm_annotated <- annotate_regions(
+    regions = wgpos,
+    annotations = region,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+  
+  dat_annot <- data.frame(dm_annotated)
+  
+  return(dat_annot)
+}
+
+# read data
+mkreg <- function(dat){
+  
+colnames(dat) <- c("seqnames", "start", "end", "names")
+dat2 <-dat %>% mutate(regid = paste0(seqnames,":",start,"-", end),
+                       reglength = end - start +1)
+
+wk <- dat2 %>% left_join(annot(dat2, gene_region), by="regid") %>% 
+  mutate(genecat=ifelse(is.na(annot.type), "non-gene", "gene")) %>% distinct(regid, genecat)
+
+datf <- dat2 %>% left_join(wk, by="regid")
+
+return(datf)
+}
+
+# pwd in target region
+mkdata <- function(dat, region){
+
+pwdlist <- list()
+for (i in 1:length(comparelist)){
+  
+ck <- annot(comparelist[[i]], region) %>% group_by(annot.regid) %>% 
+  mutate(n_sites = length(start), 
+          ave_pwd = mean(pwd), 
+            regid = annot.regid) %>% ungroup %>% 
+  distinct(regid, n_sites, ave_pwd) %>% 
+   rename("n_sites" = sprintf("n_sites_%s", namelist[[i]]),
+            "ave_pwd" = sprintf("ave_pwd_%s", namelist[[i]]))
+   
+pwdlist[[i]] <- dat %>% left_join(ck, by="regid")
+   
+}
+
+mergepwd <- bind_cols(pwdlist) %>% rowwise() %>% 
+  mutate(n_sites=max(c_across(starts_with("n_sites_")))) %>% ungroup %>%
+  dplyr::select(seqnames...1, start...2, end...3, names...4, regid...5, reglength...6, genecat...7, n_sites, starts_with("ave_pwd_")) %>%
+   rename("seqnames...1" = "seqnames",
+           "start...2" = "start",
+             "end...3" = "end",
+              "names...4" = "names",
+               "regid...5" = "regid",
+                "reglength...6" = "reglength",
+                 "genecat...7" = "genecat") 
+return(mergepwd)
+}
+
+mkdatfunc <- function(region){
+  regannot <- list()
+for (i in 1:22){
+  
+regannot[[i]] <- annot(chrannot[[i]], region) %>% rowwise() %>% 
+    mutate(n_sites=max(c_across(starts_with("n_sites_"))),
+            genecat=ifelse(is.na(annot.type), "non-gene", "gene")) %>% 
+    filter(n_sites>=1) %>% ungroup %>% 
+    distinct(seqnames, start, end, n_sites, ave_pwd_N1N2, ave_pwd_JAJB, ave_pwd_IAIB, ave_pwd_DADB, ave_pwd_HAHB, ave_pwd_MAMB,ave_pwd_ENJN,ave_pwd_ENIN, genecat, annot.regid) 
+
+}
+regannotf <- bind_rows(regannot)
+
+return(regannotf)
+}
+
+mkplot <- function(dat, titlelist, xmax){
+
+ck <- dat %>% group_by(n_sites, genecat) %>% 
+  mutate(N1N2=mean(ave_pwd_N1N2),
+           JAJB=mean(ave_pwd_JAJB),
+           IAIB=mean(ave_pwd_IAIB),
+           DADB=mean(ave_pwd_DADB),
+           HAHB=mean(ave_pwd_HAHB),
+           MAMB=mean(ave_pwd_MAMB),
+         ENJN=mean(ave_pwd_ENJN),
+         ENIN=mean(ave_pwd_ENIN)) %>% 
+    distinct(n_sites, genecat, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENJN,ENIN) %>% 
+    pivot_longer(N1N2:ENIN)
+
+plot1 <- ck %>% filter(genecat=="gene") %>%  
+  ggplot(aes(x = n_sites, y = value)) +
+  geom_line(aes(color = name)) +
+   ylim(0, 0.6) +
+     xlim(0, xmax) +
+    xlab("\n CpG numbers") +
+     ylab("Average pwd\n") +
+      ggtitle("In gene region\n") + 
+       guides(color=guide_legend(" "))
+
+plot2 <- ck %>% filter(genecat=="non-gene") %>% 
+  ggplot(aes(x = n_sites, y = value)) +
+  geom_line(aes(color = name)) +
+    ylim(0, 0.6) +
+     xlim(0, xmax) +
+    xlab("\n CpG numbers") +
+     ylab("Average pwd\n") +
+      ggtitle("Non gene region\n") + 
+       guides(color=guide_legend(" "))
+
+print(combine_plots(
+  plotlist = list(plot1, plot2),
+  plotgrid.args = list(ncol = 1, nrow = 2),
+  annotation.args = list(
+    tag_levels = "a",
+    title = titlelist)))
+}
+
+```
+
+
+
+```{r readdata, echo=FALSE, warning=FALSE}
+
+wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed")
+wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed")
+wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed")
+wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed")
+wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
+wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
+ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
+ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+
+generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
+
+uniquetranscript <- generef %>% filter(type=="transcript") %>% 
+  mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+   group_by(gene_id) %>% 
+    mutate(maxtran = max(region_length)) %>% 
+     filter(region_length==maxtran) %>% ungroup %>% 
+       group_by(gene_id) %>% mutate(rank=row_number()) %>% filter(rank==1) %>% 
+        dplyr::select(gene_id, transcript_id)
+
+generef2 <- generef %>% right_join(uniquetranscript,by=c("gene_id", "transcript_id")) %>% mutate(region_length=ifelse(end==start, 2, end-start+1)) %>% 
+  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+wholegene <- generef2 %>% dplyr::filter(type=="transcript") %>% 
+  mutate(tss_start = ifelse(strand=="+", start - 2000, start),
+          tss_end = ifelse(strand=="+", end, end + 2000),
+           region_length = tss_end - tss_start +1, 
+            tss_type = "wholegene") %>% 
+               dplyr::select(-start, -end, -type) %>% 
+                mutate(start=tss_start, end=tss_end, type=tss_type) %>% 
+                 dplyr::select(-tss_start, -tss_end, -tss_type) %>%
+                  dplyr::select(seqid, start, end, region_length, source, type, everything())
+
+gene_region <- GRanges(wholegene)
+
+# http://hgdownload.cse.ucsc.edu/goldenpath/hg38/database/cpgIslandExt.txt.gz
+cpgisland <- as.data.frame(fread("../Alu/cpgIslandExt.txt", header = F)) %>% dplyr::select(V2:V5)
+cpgislandf <- mkreg(cpgisland)
+cpgislandregion <- GRanges(cpgislandf)
+
+
+# https://www.biostars.org/p/58889/
+# http://genome.ucsc.edu/cgi-bin/hgTables
+alu <- as.data.frame(fread("../Alu/alu.bed", header = F)) %>% dplyr::select(V1:V4)
+aluf <- mkreg(alu)
+aluregion <- GRanges(aluf)
+
+
+```
+
+
+# Compare CpG island vs. Alu repeat
+
+```{r compare, echo=FALSE, warning=FALSE}
+
+compare <- annot(cpgislandf, aluregion) %>% 
+  mutate(type=ifelse(start<=annot.start & end>=annot.end, "nested", "not-nested")) %>% 
+  dplyr::select(regid, width, annot.regid, annot.width, genecat, type)
+
+cat("\n cpgisland length \n")
+summary(cpgislandf$reglength)
+
+cat("\n Alu repeats length \n")
+summary(aluf$reglength)
+
+table(compare$genecat, compare$type)
+
+cat("\n list of adjacent cpgisland and alu repeats \n")
+notnested <- compare %>% filter(type=="not-nested")
+head(notnested, n=25)
+
+```
+
+# CpG island
+
+```{r cpg, echo=FALSE, warning=FALSE}
+
+comparelist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd, ENJNpwd, ENINpwd)
+namelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN")
+titlelist <- c("Fig1. Average all CpG islands", "Fig2. Average all Alu repeats", "Fig3. Average all CpG region associated bins in all chromosomes", "Fig4. Average all Alu repeates associated bins in all chromosomes")
+
+cpgmergepwd <- mkdata(cpgislandf, cpgislandregion)
+
+write_csv(cpgmergepwd, "../Alu/cpgisland_pwd.csv")
+ck <- read_csv("../Alu/cpgisland_pwd.csv")
+
+summary(cpgmergepwd)
+
+cat("\n cpgisland length \n")
+tapply(cpgmergepwd$reglength, cpgmergepwd$genecat, summary)
+
+cat("\n Number of CpGs in each cpgisland \n")
+tapply(cpgmergepwd$n_sites, cpgmergepwd$genecat, summary)
+
+
+mkplot(cpgmergepwd, titlelist[[1]], 1200)
+
+```
+
+# Alu repeats
+
+```{r alu, echo=FALSE, warning=FALSE}
+
+alumergepwd <- mkdata(aluf, aluregion)
+
+foroutput1 <- alumergepwd %>% filter(row_number()<=600000)
+foroutput2 <- alumergepwd %>% filter(row_number()>600000)
+write_csv(foroutput1, "../Alu/alurepeats_pwd_v1.csv")
+write_csv(foroutput2, "../Alu/alurepeats_pwd_v2.csv")
+
+
+summary(alumergepwd)
+
+cat("\n Alu repeat length \n")
+tapply(alumergepwd$reglength, alumergepwd$genecat, summary)
+
+cat("\n Number of CpGs in each Alu repeat \n")
+tapply(alumergepwd$n_sites, alumergepwd$genecat, summary)
+
+mkplot(alumergepwd, titlelist[[2]], 34)
+
+```
+
+
+# cpgisland associated bins
+
+```{r cpgbins, echo=FALSE, warning=FALSE}
+
+chrannot <- readRDS("../chrdata/chrannot.Rds")
+
+cpgislandannotf <- mkdatfunc(cpgislandregion)
+write_csv(cpgislandannotf, "../Alu/cpgislandAssociated_bins.csv")
+ck <- read_csv("../Alu/cpgislandAssociated_bins.csv")
+
+summary(cpgislandannotf)
+
+mkplot(cpgislandannotf, titlelist[[3]], 26)
+
+```
+
+
+# Alu repeats associated bins
+
+```{r alubins, echo=FALSE, warning=FALSE}
+
+aluannotf <- mkdatfunc(aluregion)
+write_csv(aluannotf, "../Alu/AlurepeatsAssociated_bins.csv")
+ck <- read_csv("../Alu/AlurepeatsAssociated_bins.csv")
+
+aluoutput1 <- aluannotf %>% filter(row_number()<=1000000)
+aluoutput2 <- aluannotf %>% filter(row_number()>1000000 & row_number()<=2000000)
+aluoutput3 <- aluannotf %>% filter(row_number()>2000000)
+
+write_csv(aluoutput1, "../Alu/AlurepeatsAssociated_bins_v1.csv")
+write_csv(aluoutput2, "../Alu/AlurepeatsAssociated_bins_v2.csv")
+write_csv(aluoutput3, "../Alu/AlurepeatsAssociated_bins_v3.csv")
+
+summary(aluannotf)
+
+mkplot(aluannotf, titlelist[[4]], 20)
+
+```
+
+
+
+
+
+
