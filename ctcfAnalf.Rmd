@@ -21,7 +21,7 @@ require(readr)
 library(ggridges)
 library("genomation")
 library(ROCR)
-library("ggpubr")
+library(ggpubr)
 source("H3K27func.R")
 
 ```
@@ -124,7 +124,7 @@ saveRDS(ctcffinal, file = "../CTCF/ctcf_data.Rds")
 # filtered for ave_score>100 & #CpGs>=5 bins
 
 datalist <- readRDS("../CTCF/ctcf_data.Rds")
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB","ENJN","ENIN")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- datalist[[i]] %>% filter(ave_score>100) %>% 
@@ -138,7 +138,7 @@ table(ckdata$seqnames)
 write_csv(ckdata, "../CTCF/ctcf_wgdata.csv")
 
 # remove duplicate, make wide form data
-ckdata <- read_csv("ctcf_wgdata.csv")
+ckdata <- read_csv("../CTCF/ctcf_wgdata.csv")
 # 11511 bins total
 wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
 # 7991
@@ -167,7 +167,7 @@ write_csv(longdataf, "../CTCF/ctcf_long_unique.csv")
 
 ```{r mkplotdata, echo=FALSE, warning=FALSE}
 # summary data by each chromosome
-datalist <- readRDS("ctcf_data.Rds")
+datalist <- readRDS("../CTCF/ctcf_data.Rds")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- mkdata(datalist[[i]], sprintf("chr%s", i), 100)
@@ -182,7 +182,7 @@ write_csv(ckdata, "../CTCF/allchrCtcf_data.csv")
 
 ```{r mkplot, echo=FALSE, warning=FALSE, eval=FALSE}
 # make plots by chromosome
-ckdata <- read.csv("allchrCtcf_data.csv", header=TRUE, stringsAsFactors=FALSE)
+ckdata <- read.csv("../CTCF/allchrCtcf_data.csv", header=TRUE, stringsAsFactors=FALSE)
 ckdata %>% 
   ggplot(aes(x = nongene, y = value)) +
   geom_point(aes(color = name)) +
@@ -200,19 +200,19 @@ ckdata %>%
 # Make data for each cell line
 
 ```{r mkdata1, echo=FALSE, warning=FALSE, eval=FALSE}
-datalist <- readRDS("ctcf_data.Rds")
-scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf", "ave_score")
+#datalist <- readRDS("ctcf_data.Rds")
+#scorelist <- list("score_gm12878", "score_h1hesc", "score_hsmm", "score_huvec", "score_k562", "score_nhec", "score_nhlf", "ave_score")
 
-celllist <- list()
-for (j in 1:8){
-  for (i in 1:22){
-    celllist[[i]] <- mkdata1(datalist[[i]], scorelist[[j]], 100)
-   }
+#celllist <- list()
+#for (j in 1:8){
+#  for (i in 1:22){
+#    celllist[[i]] <- mkdata1(datalist[[i]], scorelist[[j]], 100)
+#   }
 
-  celldata <- bind_rows(celllist)
+#  celldata <- bind_rows(celllist)
 
-write_csv(celldata, sprintf("%s_Ctcfdata.csv", scorelist[[j]]))
-}
+#write_csv(celldata, sprintf("%s_Ctcfdata.csv", scorelist[[j]]))
+#}
 
 ```
 

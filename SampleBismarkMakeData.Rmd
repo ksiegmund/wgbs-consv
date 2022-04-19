@@ -78,17 +78,17 @@ gendf <- function(data){
 return(df)
 }
 
-metdata_s1 <- fread("~/bismarkData/bed/FA1.bed", header=F)
+metdata_s1 <- fread("~/bismarkData/bed/PA5combine.bed", header=F)
 colnames(metdata_s1) <- c("chr", "start", "end", "beta", "coverage", "num_met", "num_unmet")
 
-metdata_s2 <- fread("~/bismarkData/bed/FB2.bed", header=F)
+metdata_s2 <- fread("~/bismarkData/bed/PB6combine.bed", header=F)
 colnames(metdata_s2) <- c("chr", "start", "end", "beta", "coverage", "num_met", "num_unmet")
 
 # S1-S4: N1-N2
 joins <- inner_join(metdata_s1, metdata_s2, by = c('chr', 'start', 'end'))
 df_pwd <- gendf(joins)
 summary(df_pwd)
-write.table(df_pwd, "~/bismarkData/bed/FAFBpwd.bed", row.names = F, col.names = F, quote = F, sep = "\t")
+write.table(df_pwd, "~/bismarkData/bed/PABpwd.bed", row.names = F, col.names = F, quote = F, sep = "\t")
 
 # S2-S3: TA1-TB1
 #joins <- inner_join(metdata_s2, metdata_s3, by = c('chr', 'start', 'end')) 

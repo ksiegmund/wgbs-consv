@@ -58,8 +58,15 @@ wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed")
 wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed") 
 wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
 wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
-ENJNnpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
-ENINnpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
+ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+EAEBpwd <- read_pwd("~/bismarkData/bed/EABpwd.bed")
+FAFBpwd <- read_pwd("~/bismarkData/bed/FABpwd.bed")
+KAKBpwd <- read_pwd("~/bismarkData/bed/KABpwd.bed")
+PAPBpwd <- read_pwd("~/bismarkData/bed/PABpwd.bed")
+SASBpwd <- read_pwd("~/bismarkData/bed/SABpwd.bed")
+XAXBpwd <- read_pwd("~/bismarkData/bed/XABpwd.bed")
+
 generef <- readGFF("~/My-Nhi Nguyen/DNAm/Caihong/DepMap/hg38.ncbiRefSeq.gtf.gz")
 
 uniquetranscript <- generef %>% filter(type=="transcript") %>% 
@@ -176,3 +183,17 @@ notgene <- ENINnpwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end")
 summary(notgene$pwd)
 
 ```
+
+
+# EAEB
+
+```{r ingene, echo=FALSE, warning=FALSE}
+summary(EAEBpwd$pwd)
+ingene <- annot(ENINnpwd, gene_region) %>% distinct(seqnames, start, end, pwd)
+summary(ingene$pwd)
+notgene <- ENINnpwd %>% anti_join(ingene, by=c("chr"="seqnames", "start", "end"))
+summary(notgene$pwd)
+
+```
+
+
