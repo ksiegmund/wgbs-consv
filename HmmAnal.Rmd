@@ -75,6 +75,7 @@ return(ck)
 
 state <- read_bed("../Hmm/wgEncodeBroadHmmGm12878HMM.bed") %>% distinct(grp, type)
 write_csv(state, "../Hmm/Hmm_state.csv")
+#state <- read_csv("../Hmm/Hmm_state.csv")
 
 celllist <- list("Gm12878", "H1hesc", "Hsmm", "Huvec", "K562", "Nhek", "Nhlf")
 
@@ -166,11 +167,17 @@ hmmdata[[i]] <- hmmfinal[[i]] %>%
            MAMB=mean(ave_pwd_MAMB),
            ENIN=mean(ave_pwd_ENIN),
            ENJN=mean(ave_pwd_ENJN),
+           EAEB=mean(ave_pwd_EAEB),
+           FAFB=mean(ave_pwd_FAFB),
+           KAKB=mean(ave_pwd_KAKB),
+           PAPB=mean(ave_pwd_PAPB),
+           SASB=mean(ave_pwd_SASB),
+           XAXB=mean(ave_pwd_XAXB),
            n_bins = length(regid)) %>% ungroup %>% 
-  distinct(seqnames, Names, n_bins, N1N2, JAJB, IAIB, DADB, HAHB, MAMB, ENIN, ENJN) %>% 
+  distinct(seqnames, Names, n_bins, N1N2, JAJB, IAIB, DADB, HAHB, MAMB, ENIN, ENJN, EAEB, FAFB, KAKB, PAPB,SASB,XAXB ) %>% 
    left_join(state, by=c("Names"="grp")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>% 
-      arrange(Names) %>% pivot_longer(N1N2:ENJN) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:XAXB) %>% 
        left_join(comb, by = "name" ) 
 }
 saveRDS(hmmdata, file = "../Hmm/Hmmfinal_data.Rds")
@@ -182,7 +189,7 @@ hmmdata_wg <- bind_rows(hmmfinal) %>%
     ungroup
 
 write_csv(hmmdata_wg, "../Hmm/hmm_wg.csv")
-
+#hmmdata_wg <- read_csv("../Hmm/hmm_wg.csv")
 
 hmmdata_all <- hmmdata_wg %>% group_by(Names) %>% 
     mutate(N1N2=mean(ave_pwd_N1N2),
@@ -193,15 +200,21 @@ hmmdata_all <- hmmdata_wg %>% group_by(Names) %>%
            MAMB=mean(ave_pwd_MAMB),
            ENIN=mean(ave_pwd_ENIN),
            ENJN=mean(ave_pwd_ENJN),
+           EAEB=mean(ave_pwd_EAEB),
+           FAFB=mean(ave_pwd_FAFB),
+           KAKB=mean(ave_pwd_KAKB),
+           PAPB=mean(ave_pwd_PAPB),
+           SASB=mean(ave_pwd_SASB),
+           XAXB=mean(ave_pwd_XAXB),
            n_bins = length(regid), 
            ave_n_sites = mean(n_sites),
            var_n_sites = var(n_sites),
            min_n_sites = min(n_sites),
            max_n_sites = max(n_sites)) %>% ungroup %>% 
-  distinct(Names, n_bins, ave_n_sites, var_n_sites, min_n_sites, max_n_sites, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENIN,ENJN) %>% 
+  distinct(Names, n_bins, ave_n_sites, var_n_sites, min_n_sites, max_n_sites, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENIN,ENJN, EAEB, FAFB, KAKB, PAPB,SASB,XAXB) %>% 
    left_join(state, by=c("Names"="grp")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>% 
-      arrange(Names) %>% pivot_longer(N1N2:ENJN) %>% 
+      arrange(Names) %>% pivot_longer(N1N2:XAXB) %>% 
        left_join(comb, by = "name" ) 
 
 write_csv(hmmdata_all, "../Hmm/hmmsum_wg.csv")
@@ -229,6 +242,8 @@ write_csv(hmm6data_unique, "../Hmm/hmm6_wg_unique.csv")
 # 2639
 
 state <- state %>% mutate(Names = as.factor(grp))
+
+hmmdata_wg$Names <- as.factor(hmmdata_wg$Names)
 
 hmmdata_wg %>% left_join(state, by=c("Names")) %>% 
      mutate(statename=paste0(Names, "_", type)) %>%  

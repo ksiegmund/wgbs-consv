@@ -22,7 +22,7 @@ library(rtracklayer)
 require(readr)
 library(ggridges)
 library(ggstatsplot)
-library(ggpubr)
+#library(ggpubr)
 
 ```
 
@@ -103,7 +103,7 @@ regannot[[i]] <- annot(chrannot[[i]], region) %>% rowwise() %>%
     mutate(n_sites=max(c_across(starts_with("n_sites_"))),
             genecat=ifelse(is.na(annot.type), "non-gene", "gene")) %>% 
     filter(n_sites>=1) %>% ungroup %>% 
-    distinct(seqnames, start, end, n_sites, ave_pwd_N1N2, ave_pwd_JAJB, ave_pwd_IAIB, ave_pwd_DADB, ave_pwd_HAHB, ave_pwd_MAMB,ave_pwd_ENJN,ave_pwd_ENIN, genecat, annot.regid) 
+    distinct(seqnames, start, end, n_sites, ave_pwd_N1N2, ave_pwd_JAJB, ave_pwd_IAIB, ave_pwd_DADB, ave_pwd_HAHB, ave_pwd_MAMB,ave_pwd_ENJN,ave_pwd_ENIN,ave_pwd_EAEB,ave_pwd_FAFB,ave_pwd_KAKB,ave_pwd_PAPB,ave_pwd_SASB,ave_pwd_XAXB, genecat, annot.regid) 
 
 }
 regannotf <- bind_rows(regannot)
@@ -121,16 +121,22 @@ ck <- dat %>% group_by(n_sites, genecat) %>%
            HAHB=mean(ave_pwd_HAHB),
            MAMB=mean(ave_pwd_MAMB),
          ENJN=mean(ave_pwd_ENJN),
-         ENIN=mean(ave_pwd_ENIN)) %>% 
-    distinct(n_sites, genecat, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENJN,ENIN) %>% 
-    pivot_longer(N1N2:ENIN)
+         ENIN=mean(ave_pwd_ENIN),
+         EAEB=mean(ave_pwd_EAEB),
+         FAFB=mean(ave_pwd_FAFB),
+         KAKB=mean(ave_pwd_KAKB),
+         PAPB=mean(ave_pwd_PAPB),
+         SASB=mean(ave_pwd_SASB),
+         XAXB=mean(ave_pwd_XAXB)) %>% 
+    distinct(n_sites, genecat, N1N2, JAJB, IAIB, DADB, HAHB, MAMB,ENJN,ENIN,EAEB,FAFB,KAKB,PAPB,SASB,XAXB) %>% 
+    pivot_longer(N1N2:XAXB)
 
 plot1 <- ck %>% filter(genecat=="gene") %>%  
   ggplot(aes(x = n_sites, y = value)) +
   geom_line(aes(color = name)) +
    ylim(0, 0.6) +
      xlim(0, xmax) +
-    xlab("\n CpG numbers") +
+    xlab("\n Number of CpG's") +
      ylab("Average pwd\n") +
       ggtitle("In gene region\n") + 
        guides(color=guide_legend(" "))
@@ -140,7 +146,7 @@ plot2 <- ck %>% filter(genecat=="non-gene") %>%
   geom_line(aes(color = name)) +
     ylim(0, 0.6) +
      xlim(0, xmax) +
-    xlab("\n CpG numbers") +
+    xlab("\n Number of CpG's") +
      ylab("Average pwd\n") +
       ggtitle("Non gene region\n") + 
        guides(color=guide_legend(" "))
@@ -167,6 +173,12 @@ wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed")
 wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
 ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
 ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+EAEBpwd <- read_pwd("~/bismarkData/bed/EABpwd.bed")
+FAFBpwd <- read_pwd("~/bismarkData/bed/FABpwd.bed")
+KAKBpwd <- read_pwd("~/bismarkData/bed/KABpwd.bed")
+PAPBpwd <- read_pwd("~/bismarkData/bed/PABpwd.bed")
+SASBpwd <- read_pwd("~/bismarkData/bed/SABpwd.bed")
+XAXBpwd <- read_pwd("~/bismarkData/bed/XABpwd.bed")
 
 generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 
@@ -235,8 +247,8 @@ head(notnested, n=25)
 
 ```{r cpg, echo=FALSE, warning=FALSE}
 
-comparelist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd, ENJNpwd, ENINpwd)
-namelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN")
+comparelist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd, ENJNpwd, ENINpwd,EAEBpwd,FAFBpwd,KAKBpwd,PAPBpwd,SASBpwd,XAXBpwd)
+namelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 titlelist <- c("Fig1. Average all CpG islands", "Fig2. Average all Alu repeats", "Fig3. Average all CpG region associated bins in all chromosomes", "Fig4. Average all Alu repeates associated bins in all chromosomes")
 
 cpgmergepwd <- mkdata(cpgislandf, cpgislandregion)

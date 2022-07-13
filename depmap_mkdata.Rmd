@@ -91,14 +91,20 @@ combdata <- function(dat){
 
 ```{r readdata, echo=FALSE, warning=FALSE, eval=FALSE}
 
-wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed") 
-wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed") 
-wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed") 
-wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed") 
+wgdf14pwd <- read_pwd("~/bismarkData/bed/wgdf14cpwdm.bed")
+wgdf23pwd <- read_pwd("~/bismarkData/bed/wgdf23cpwdm.bed")
+wgdf56pwd <- read_pwd("~/bismarkData/bed/wgdf56cpwdm.bed")
+wgdf12pwd <- read_pwd("~/bismarkData/bed/wgdf12pwdm.bed")
 wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed") 
-wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed")
+wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
 ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
 ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+EAEBpwd <- read_pwd("~/bismarkData/bed/EABpwd.bed")
+FAFBpwd <- read_pwd("~/bismarkData/bed/FABpwd.bed")
+KAKBpwd <- read_pwd("~/bismarkData/bed/KABpwd.bed")
+PAPBpwd <- read_pwd("~/bismarkData/bed/PABpwd.bed")
+SASBpwd <- read_pwd("~/bismarkData/bed/SABpwd.bed")
+XAXBpwd <- read_pwd("~/bismarkData/bed/XABpwd.bed")
 
 generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 
@@ -144,8 +150,8 @@ expdata <- expdata %>% dplyr::select(logtpm, average, GSE, "Gene name") %>% muta
 
 ```{r mkdata_wide, echo=FALSE, warning=FALSE, eval=FALSE}
 
-datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd, ENJNpwd, ENINpwd)
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN")
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd, EAEBpwd,FAFBpwd, KAKBpwd,PAPBpwd,SASBpwd,XAXBpwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 
 wg_tsslist <- list()
 for(i in 1:length(titlelist)){
@@ -175,7 +181,13 @@ depmap_pwdall <- depmap_pwd[[1]] %>%
   inner_join(depmap_pwd[[5]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
   inner_join(depmap_pwd[[6]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
   inner_join(depmap_pwd[[7]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
-  inner_join(depmap_pwd[[8]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))
+  inner_join(depmap_pwd[[8]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
+  inner_join(depmap_pwd[[9]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group")) %>%
+  inner_join(depmap_pwd[[10]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))%>%
+  inner_join(depmap_pwd[[11]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))%>%
+  inner_join(depmap_pwd[[12]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))%>%
+  inner_join(depmap_pwd[[13]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))%>%
+  inner_join(depmap_pwd[[14]], by=c("seqnames", "annot.gene_name", "grp", "expcat", "group"))
 
 write_csv(depmap_pwdall, "../DepMap/depmap_pwdall.csv")
 
@@ -193,8 +205,8 @@ write_csv(ckdata, "../DepMap/depmap_pwdall.csv")
 
 ```{r mkdata_long, echo=FALSE, warning=FALSE, eval=FALSE}
 
-datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd, ENJNpwd, ENINpwd)
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB","ENJN", "ENIN")
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd, EAEBpwd,FAFBpwd, KAKBpwd,PAPBpwd,SASBpwd,XAXBpwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 
 #wg_tsslist <- list()
 #for(i in 1:6){
@@ -256,7 +268,7 @@ sp <- ggscatter(wktmp, x = "ave_pwd_HAHB", y = "ave_pwd_MAMB",
 sp + stat_cor(method = "pearson", label.x = 0.7, label.y = 0.8, p.accuracy = 0.001, r.accuracy = 0.01)
 
 wk <- wktmp %>% dplyr::select(starts_with("ave_pwd_"))
-colnames(wk) <- c("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB","ENJN", "ENIN" )
+colnames(wk) <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 
 # Compute a correlation matrix
 corr <- round(cor(wk), 2)
@@ -271,13 +283,15 @@ ggcorrplot(corr, outline.col = "white", lab = TRUE, p.mat = p.mat) + labs(title 
 
 
 ## histogram
-ckdata$whichpair <- factor(ckdata$whichpair, levels = c("N1N2", "ENJN","ENIN", "JAJB", "IAIB", "DADB", "HAHB", "MAMB" ))
+ckdata$whichpair <- factor(ckdata$whichpair, levels = list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB"))
 
 ckdata %>% arrange(desc(grp)) %>% 
 ggplot(aes(x=ave_pwd, fill=grp)) +
   geom_histogram(position="identity", alpha=0.5,bins=100) +
   facet_grid(whichpair ~ .)+
-  scale_fill_manual(values=c("essential" = "red", "non-essential" ="grey"))+ xlim(c(0, 0.5))
+  scale_fill_manual(values=c("essential" = "red", "non-essential" ="grey"))+ xlim(c(0, 0.5))+
+  theme(strip.text.y = element_text(size = 5), axis.text.y = element_text(size = 5))
+  
 
 ```
 

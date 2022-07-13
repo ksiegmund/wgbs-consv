@@ -20,7 +20,7 @@ library(rtracklayer)
 require(readr)
 library(ggridges)
 library(viridis)
-library("ggpubr")
+#library("ggpubr")
 source("depmapWiganal.R")
 
 ```
@@ -36,6 +36,13 @@ wgdf34pwd <- read_pwd("~/bismarkData/bed/wgdf34pwdm.bed")
 wgdf56npwd <- read_pwd("~/bismarkData/bed/wgdf56pwdm.bed") 
 ENJNpwd <- read_pwd("~/bismarkData/bed/ENJNpwd.bed")
 ENINpwd <- read_pwd("~/bismarkData/bed/ENINpwd.bed")
+EAEBpwd <- read_pwd("~/bismarkData/bed/EABpwd.bed")
+FAFBpwd <- read_pwd("~/bismarkData/bed/FABpwd.bed")
+KAKBpwd <- read_pwd("~/bismarkData/bed/KABpwd.bed")
+PAPBpwd <- read_pwd("~/bismarkData/bed/PABpwd.bed")
+SASBpwd <- read_pwd("~/bismarkData/bed/SABpwd.bed")
+XAXBpwd <- read_pwd("~/bismarkData/bed/XABpwd.bed")
+
 generef <- readGFF("../DepMap/hg38.ncbiRefSeq.gtf.gz")
 
 uniquetranscript <- generef %>% filter(type=="transcript") %>% 
@@ -69,10 +76,10 @@ tss200region <- GRanges(geneTSS200)
 
 ```{r, echo=FALSE, warning=FALSE}
 
-datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd)
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN","ENIN")
-alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN")
-blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN")
+datlist <- list(wgdf14pwd, wgdf23pwd, wgdf56pwd, wgdf12pwd, wgdf34pwd, wgdf56npwd,ENJNpwd,ENINpwd, EAEBpwd,FAFBpwd, KAKBpwd,PAPBpwd,SASBpwd,XAXBpwd)
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
+alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN","EA","FA","KA","PA","SA","XA")
+blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN","EB","FB","KB","PB","SB","XB")
 
 avebeta_tss200 <- list()
 
@@ -148,7 +155,13 @@ tss200_pwdall <- tsslist[[1]] %>%
   inner_join(tsslist[[5]], by=c("seqnames", "start", "end")) %>%
   inner_join(tsslist[[6]], by=c("seqnames", "start", "end")) %>%
   inner_join(tsslist[[7]], by=c("seqnames", "start", "end")) %>% 
-  inner_join(tsslist[[8]], by=c("seqnames", "start", "end")) %>% distinct()
+  inner_join(tsslist[[8]], by=c("seqnames", "start", "end")) %>% 
+  inner_join(tsslist[[9]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[10]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[11]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[12]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[13]], by=c("seqnames", "start", "end")) %>%
+  inner_join(tsslist[[14]], by=c("seqnames", "start", "end")) %>% distinct()
 
 write_csv(tss200_pwdall, "../AveBeta/ave_beta_tss200_wide_unique.csv")
 

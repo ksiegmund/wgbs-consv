@@ -25,7 +25,7 @@ require(readr)
 library(ggridges)
 library(viridis)
 library(ggstatsplot)
-library("ggpubr")
+#library("ggpubr")
 source("H3K27func.R")
 ```
 
@@ -44,7 +44,7 @@ write_csv(wkhmm, "../AveBeta/selectedbins_Hmm.csv")
 
 ```{r test, echo=FALSE, warning=FALSE}
 
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN","ENIN")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 
 wktmp <- read_csv("../AveBeta/selectedbins_Hmm.csv")
 head(wktmp)
@@ -64,6 +64,7 @@ longdata[[i]] <- longtmp
 longdataf <- bind_rows(longdata) %>% distinct()
 
 write_csv(longdataf, "../AveBeta/Hmm_long_unique.csv")
+#longdataf <- read_csv("../AveBeta/Hmm_long_unique.csv")
 
 summary(longdataf)
 mode(longdataf$Names)
@@ -91,9 +92,9 @@ print(plot)
 
 ```{r mkplotpre, echo=FALSE, warning=FALSE}
 
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB",  "ENJN","ENIN")
-alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN")
-blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
+alist <- list("N1", "JA", "IA", "DA", "HA", "MA", "EN", "EN","EA","FA","KA","PA","SA","XA")
+blist <- list("N2", "JB", "IB", "DB", "HB", "MB", "JN", "IN","EB","FB","KB","PB","SB","XB")
 
 selectbins <- read_csv("../AveBeta/selectedbins_Hmm.csv")
 table(selectbins$Names)

@@ -1,0 +1,129 @@
+---
+title: "AveBetaPlotsHeatmap"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(data.table)
+library(xlsx)
+require(readr)
+library(ggridges)
+library(viridis)
+#library("ggpubr")
+library(ggpointdensity)
+
+```
+
+
+# TSS200
+
+```{r tss200, echo=FALSE, warning=FALSE}
+
+wktmp <- read_csv("../AveBeta/ave_beta_tss200_long_unique.csv")
+
+table(wktmp$whichpair)
+
+wktmp %>% 
+  ggplot(aes(x = ave_beta, y = ave_pwd)) +
+  #geom_point(aes(color = whichpair)) +
+    geom_point() +
+    ylim(0, 1) +
+      scale_x_continuous(breaks = seq(0, 1, by = 0.5)) +
+  facet_wrap(whichpair ~ ., ncol=6) +
+  #facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average methylation rate") +
+     ylab("Average pwd\n") +
+      ggtitle("TSS200 region \n") + 
+        #guides(color=guide_legend(" ")) +
+         geom_pointdensity() + 
+          scale_color_viridis_c()
+
+```
+
+# H3K27ac
+
+```{r h3k27ac, echo=FALSE, warning=FALSE}
+
+longdataf <- read_csv("../H3K27ac/H3K27ac_long_unique.csv") 
+
+table(longdataf$whichpair)
+
+longdataf %>% 
+  ggplot(aes(x = ave_beta, y = ave_pwd)) +
+   #geom_point(aes(color = whichpair)) +
+    geom_point() +
+    ylim(0, 1) +
+      scale_x_continuous(breaks = seq(0, 1, by = 0.5)) +
+  facet_wrap(whichpair ~ ., ncol=6) +
+  #facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average methylation rate") +
+     ylab("Average pwd\n") +
+      ggtitle("High H3K27ac score (>100), CpG rich region\n") + 
+       #guides(color=guide_legend(" ")) +
+         geom_pointdensity() + 
+          scale_color_viridis_c()
+
+```
+
+# H3K4me3
+
+```{r h3k4me3, echo=FALSE, warning=FALSE}
+
+longdataf <- read_csv("../H3K4me3/H3K4me3_long_unique.csv") 
+
+table(longdataf$whichpair)
+
+longdataf %>% 
+  ggplot(aes(x = ave_beta, y = ave_pwd)) +
+   #geom_point(aes(color = whichpair)) +
+    geom_point() +
+    ylim(0, 1) +
+      scale_x_continuous(breaks = seq(0, 1, by = 0.5)) +
+  facet_wrap(whichpair ~ ., ncol=6) +
+  #facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average methylation rate") +
+     ylab("Average pwd\n") +
+      ggtitle("High H3K4me3 score (>100), CpG rich region\n") + 
+       #guides(color=guide_legend(" ")) +
+         geom_pointdensity() + 
+          scale_color_viridis_c()
+
+```
+
+
+# Hmm
+
+```{r hmm, echo=FALSE, warning=FALSE}
+
+longdataf <- read_csv("../AveBeta/Hmm_long_unique.csv") 
+
+table(longdataf$Names, longdataf$whichpair)
+
+for(i in 1:6){
+  
+plot <- longdataf %>% filter(Names==i) %>% 
+  ggplot(aes(x = ave_beta, y = ave_pwd)) +
+   #geom_point(aes(color = whichpair)) +
+    geom_point() +
+    ylim(0, 1) +
+      scale_x_continuous(breaks = seq(0, 1, by = 0.5)) +
+  facet_wrap(whichpair ~ ., ncol=6) +
+  #facet_wrap(facets = ~reorder(seqnames, rank), ncol=6) +
+    xlab("\n Average methylation rate") +
+     ylab("Average pwd\n") +
+      ggtitle(sprintf("Hmm consensus state %s \n", i)) + 
+       #guides(color=guide_legend(" ")) +
+         geom_pointdensity() + 
+          scale_color_viridis_c()
+
+print(plot)
+  
+}
+
+```
+

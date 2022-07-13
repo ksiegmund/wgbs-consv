@@ -21,7 +21,7 @@ require(readr)
 library(ggridges)
 library("genomation")
 library(ROCR)
-library(ggpubr)
+#library(ggpubr)
 source("H3K27func.R")
 
 ```
@@ -139,11 +139,11 @@ write_csv(ckdata, "../CTCF/ctcf_wgdata.csv")
 
 # remove duplicate, make wide form data
 ckdata <- read_csv("../CTCF/ctcf_wgdata.csv")
-# 11511 bins total
+# 5291 bins
 wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
-# 7991
+#
 write_csv(wkck, "../CTCF/ctcf_wide_unique.csv")
-
+#wkck <- read_csv("../CTCF/ctcf_wide_unique.csv")
 # make long form data
 longdata <- list()
 for(i in 1:length(titlelist)){

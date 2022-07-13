@@ -18,7 +18,7 @@ library(xlsx)
 library(rtracklayer)
 require(readr)
 library("genomation")
-library("ggpubr")
+#library(ggpubr)
 source("H3K27func.R")
 
 ```
@@ -123,7 +123,7 @@ saveRDS(acfinal, file = "../H3K27ac/H3K27ac_data.Rds")
 # filtered for ave_score>100 & #CpGs>=5 bins
 
 datalist <- readRDS("../H3K27ac/H3K27ac_data.Rds")
-titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN")
+titlelist <- list("N1N2", "JAJB", "IAIB", "DADB", "HAHB", "MAMB", "ENJN", "ENIN", "EAEB", "FAFB", "KAKB", "PAPB", "SASB", "XAXB")
 comblist <- list()
 for(i in 1:22){
   comblist[[i]] <- datalist[[i]] %>% filter(ave_score>100) %>% 
@@ -137,12 +137,13 @@ table(ckdata$seqnames)
 write_csv(ckdata, "../H3K27ac/H3K27ac_wgdata.csv")
 
 ckdata <- read_csv("../H3K27ac/H3K27ac_wgdata.csv")
-# 12970 bins total
+# 8393 bins total
 
 # remove duplicate, make wide form data
 wkck <- ckdata %>% dplyr::select(-annot.type, -annot.gene_name) %>% distinct()
-# 6248
+# 4129 bins
 write_csv(wkck, "../H3K27ac/H3K27ac_wide_unique.csv")
+#wkck <- read_csv("../H3K27ac/H3K27ac_wide_unique.csv")
 
 # make long form data
 longdata <- list()
@@ -161,6 +162,7 @@ longdataf <- bind_rows(longdata)
 table(longdataf$whichpair)
 
 write_csv(longdataf, "../H3K27ac/H3K27ac_long_unique.csv")
+#longdataf <- read_csv("../H3K27ac/H3K27ac_long_unique.csv")
 
 # make plots
 longdataf %>% 
